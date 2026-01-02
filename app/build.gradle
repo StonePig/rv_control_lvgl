@@ -5,9 +5,10 @@ plugins {
 android {
     compileSdkVersion 30
 
+
     defaultConfig {
         applicationId "com.hybird.lvgl.android"
-        minSdkVersion 19
+        minSdkVersion 21
         targetSdkVersion 30
         versionCode 1
         versionName "1.0"
@@ -20,7 +21,7 @@ android {
         }
 
         ndk{
-            abiFilters 'armeabi-v7a'
+            abiFilters 'x86_64', 'arm64-v8a', 'armeabi-v7a', 'x86'
         }
     }
 
@@ -43,6 +44,7 @@ android {
     buildFeatures {
         viewBinding true
     }
+    namespace 'com.hybird.lvgl.android'
 }
 
 dependencies {

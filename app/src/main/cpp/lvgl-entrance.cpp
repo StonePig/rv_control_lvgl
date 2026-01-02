@@ -9,7 +9,7 @@
 
 #include "lvgl.h"
 #include "lvgl/lvgl.h"
-#include "ui.h"
+#include "rv_control/ui.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +57,11 @@ static void copy_px(uint8_t *data, lv_color_t *color_p, int w) {
         data[0] = color_p->ch.red;
         data[1] = color_p->ch.green;
         data[2] = color_p->ch.blue;
+#if LV_COLOR_DEPTH == 32            
         data[3] = color_p->ch.alpha;
+#else
+        data[3] = 0xff;
+#endif        
         color_p++;
         data += 4;
     }
@@ -66,7 +70,7 @@ static void copy_px(uint8_t *data, lv_color_t *color_p, int w) {
 static uint32_t *buf;
 
 static void window_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
-    __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s", __func__);
+    __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s,%d,%d", __func__,WIDTH,HEIGHT);
     int left = area->x1;
     if (left < 0)
         left = 0;
@@ -171,7 +175,7 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeChanged(JNIEnv *env, jclass
 
     clearScreen();
 
-    gui_init();
+    ui_init();
 
     run = true;
     pthread_create(&thread, 0, refresh_task, 0);
