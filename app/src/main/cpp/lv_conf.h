@@ -20,7 +20,7 @@
  *====================*/
 
 /*Color depth: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)*/
-#define LV_COLOR_DEPTH     16
+#define LV_COLOR_DEPTH     32
 
 /*Swap the 2 bytes of RGB565 color. Useful if the display has a 8 bit interface (e.g. SPI)*/
 #define LV_COLOR_16_SWAP   0
@@ -185,12 +185,12 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
  *-----------*/
 
 /*1: Show CPU usage and FPS count in the right bottom corner*/
-#define LV_USE_PERF_MONITOR     1
+#define LV_USE_PERF_MONITOR     0
 #define CONFIG_LV_USE_PERF_MONITOR_POS LV_ALIGN_TOP_RIGHT
 
 /*1: Show the used memory and the memory fragmentation  in the left bottom corner
  * Requires LV_MEM_CUSTOM = 0*/
-#define LV_USE_MEM_MONITOR      1
+#define LV_USE_MEM_MONITOR      0
 #define CONFIG_LV_USE_MEM_MONITOR_POS LV_ALIGN_TOP_LEFT
 
 /*1: Draw random colored rectangles over the redrawn areas*/
