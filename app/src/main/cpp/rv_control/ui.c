@@ -35,6 +35,12 @@ void ui_init(void)
     lv_disp_set_theme(dispp, theme);
     ui_Screen1_screen_init();
     ui_Screen2_screen_init();
+    ui_Screen3_screen_init();
+    ui_Screen4_screen_init();
+    ui_Screen5_screen_init();
+    ui_Screen6_screen_init();
+    ui_Screen7_screen_init();
+    ui_Screen8_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_Screen1);
 }
@@ -43,10 +49,22 @@ void ui_destroy(void)
 {
     ui_Screen1_screen_destroy();
     ui_Screen2_screen_destroy();
+    ui_Screen3_screen_destroy();
+    ui_Screen4_screen_destroy();
+    ui_Screen5_screen_destroy();
+    ui_Screen6_screen_destroy();
+    ui_Screen7_screen_destroy();
+    ui_Screen8_screen_destroy();
 }
 
 void ui_relocalize(void)
 {
     ui_Screen1_screen_relocalize();
     ui_Screen2_screen_relocalize();
+    ui_Screen3_screen_relocalize();
+    ui_Screen4_screen_relocalize();
+    ui_Screen5_screen_relocalize();
+    ui_Screen6_screen_relocalize();
+    ui_Screen7_screen_relocalize();
+    ui_Screen8_screen_relocalize();
 }

@@ -6,27 +6,15 @@
 #include "../ui.h"
 
 lv_obj_t * ui_Screen2 = NULL;
-lv_obj_t * ui_Imagecharger = NULL;
+
+static lv_obj_t * ui_Imagecharger = NULL;
+
+extern void _ui_common_screen_change(uint16_t cur_screen_id, lv_event_t * e);
+
 // event funtions
 void ui_event_Screen2(lv_event_t * e)
 {
-    lv_event_code_t event_code = lv_event_get_code(e);
-    // 获取屏幕坐标,如果点击不在矩形范围内,则不处理 
-    lv_obj_t * cont = lv_event_get_target(e);
-    lv_indev_t * indev = lv_indev_get_act(); // 获取输入设备
-    if (indev == NULL) return;
-    
-    lv_point_t point;
-    lv_indev_get_point(indev, &point); // 获取触摸点坐标
-    if(point.x < 1920 / 8 * 0 || point.x > 1920 / 8 * 0 + 1920 / 8 || point.y < 980 || point.y > 1199) {
-        return;
-    }
-
-    if(event_code == LV_EVENT_CLICKED) {
-        
-
-        _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 50, 0, &ui_Screen1_screen_init);
-    }
+    _ui_common_screen_change(1, e);
 }
 
 // build funtions

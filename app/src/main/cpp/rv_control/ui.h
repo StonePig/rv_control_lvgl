@@ -21,6 +21,12 @@ extern "C" {
 
 #include "screens/ui_Screen1.h"
 #include "screens/ui_Screen2.h"
+#include "screens/ui_Screen3.h"
+#include "screens/ui_Screen4.h"
+#include "screens/ui_Screen5.h"
+#include "screens/ui_Screen6.h"
+#include "screens/ui_Screen7.h"
+#include "screens/ui_Screen8.h"
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -32,6 +38,13 @@ extern lv_obj_t * ui____initial_actions0;
 // IMAGES AND IMAGE SETS
 LV_IMG_DECLARE(ui_img_homepage_png);    // assets/homepage.png
 LV_IMG_DECLARE(ui_img_charger_png);    // assets/charger.png
+LV_IMG_DECLARE(ui_img_water_box_png);    // assets/water_box.png
+LV_IMG_DECLARE(ui_img_device_png);    // assets/device.png
+LV_IMG_DECLARE(ui_img_light_png);    // assets/light.png
+LV_IMG_DECLARE(ui_img_setting_png);    // assets/setting.png
+LV_IMG_DECLARE(ui_img_camera_png);    // assets/camera.png
+LV_IMG_DECLARE(ui_img_balance_png);    // assets/balance.png
+
 
 // UI INIT
 void ui_init(void);
