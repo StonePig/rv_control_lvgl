@@ -25,7 +25,7 @@ static TouchState state;
 static int WIDTH = 0;
 static int HEIGHT = 0;
 //#define DISP_BUF_SIZE 128 * 1024
-#define DISP_BUF_SIZE 1024 * 1024
+#define DISP_BUF_SIZE 1920 * 1200
 
 static ANativeWindow *window;
 static lv_color_t lv_buf_1[DISP_BUF_SIZE];
@@ -144,7 +144,7 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeChanged(JNIEnv *env, jclass
         return;
     }
 
-    //显示屏初始化
+    //显示屏初始化~
     WIDTH = width;
     HEIGHT = height;
     buf = new uint32_t[WIDTH * HEIGHT];

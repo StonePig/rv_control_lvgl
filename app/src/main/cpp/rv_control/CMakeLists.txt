@@ -8,8 +8,11 @@ SET(SOURCES screens/ui_Screen1.c
     screens/ui_Screen8.c
     ui.c
     ui_common.c
+    backlight.c
     components/ui_comp_hook.c
     ui_helpers.c
-    images/ui_img_homepage_png.c)
+    images/ui_img_homepage_png.c
+    images/ui_img_switch_on_png.c
+    images/ui_img_switch_off_png.c)
 
 add_library(ui ${SOURCES})

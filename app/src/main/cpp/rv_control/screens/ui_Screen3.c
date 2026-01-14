@@ -11,29 +11,25 @@ static lv_obj_t * ui_Imagewater_box = NULL;
 
 extern void _ui_common_screen_change(uint16_t cur_screen_id, lv_event_t * e);
 
-// event funtions
-void ui_event_Screen3(lv_event_t * e)
-{
-    _ui_common_screen_change(2, e);
-}
-
 // build funtions
-
 void ui_Screen3_screen_init(void)
 {
     ui_Screen3 = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screen3, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
+    // 设置背景色为深蓝色
+    lv_obj_set_style_bg_color(ui_Screen3, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_Screen3, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(ui_Screen3, 1920, 1200);        
+
     ui_Imagewater_box = lv_img_create(ui_Screen3);
     lv_img_set_src(ui_Imagewater_box, &ui_img_water_box_png);
     lv_obj_set_width(ui_Imagewater_box, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Imagewater_box, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_align(ui_Imagewater_box, LV_ALIGN_CENTER);
+    lv_obj_set_align(ui_Imagewater_box, LV_ALIGN_TOP_LEFT);
     lv_obj_add_flag(ui_Imagewater_box, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Imagewater_box, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-
-    lv_obj_add_event_cb(ui_Screen3, ui_event_Screen3, LV_EVENT_ALL, NULL);
-
+    ui_draw_navigation_bar(ui_Screen3);
 }
 
 void ui_Screen3_screen_destroy(void)
@@ -43,6 +39,7 @@ void ui_Screen3_screen_destroy(void)
     // NULL screen variables
     ui_Screen3 = NULL;
     ui_Imagewater_box = NULL;
+    ui_navigation_bar_destroy();
 
 }
 

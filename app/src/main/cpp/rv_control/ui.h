@@ -44,12 +44,35 @@ LV_IMG_DECLARE(ui_img_light_png);    // assets/light.png
 LV_IMG_DECLARE(ui_img_setting_png);    // assets/setting.png
 LV_IMG_DECLARE(ui_img_camera_png);    // assets/camera.png
 LV_IMG_DECLARE(ui_img_balance_png);    // assets/balance.png
+LV_IMG_DECLARE(ui_img_switch_on_png);    // switch ON state
+LV_IMG_DECLARE(ui_img_switch_off_png);    // switch OFF state
+LV_IMG_DECLARE(ui_img_homepage_unsel_png);    // assets/homepage_unsel.png
+LV_IMG_DECLARE(ui_img_charger_unsel_png);    // assets/charger_unsel.png
+LV_IMG_DECLARE(ui_img_water_box_unsel_png);    // assets/water_box_unsel.png
+LV_IMG_DECLARE(ui_img_device_unsel_png);    // assets/device_unsel.png
+LV_IMG_DECLARE(ui_img_light_unsel_png);    // assets/light_unsel.png
+LV_IMG_DECLARE(ui_img_setting_unsel_png);    // assets/setting_unsel.png
+LV_IMG_DECLARE(ui_img_camera_unsel_png);    // assets/camera_unsel.png
+LV_IMG_DECLARE(ui_img_balance_unsel_png);    // assets/balance_unsel.png
+LV_IMG_DECLARE(ui_img_homepage_sel_png);    // assets/homepage_sel.png
+LV_IMG_DECLARE(ui_img_charger_sel_png);    // assets/charger_sel.png
+LV_IMG_DECLARE(ui_img_water_box_sel_png);    // assets/water_box_sel.png
+LV_IMG_DECLARE(ui_img_device_sel_png);    // assets/device_sel.png
+LV_IMG_DECLARE(ui_img_light_sel_png);    // assets/light_sel.png
+LV_IMG_DECLARE(ui_img_setting_sel_png);    // assets/setting_sel.png
+LV_IMG_DECLARE(ui_img_camera_sel_png);    // assets/camera_sel.png
+LV_IMG_DECLARE(ui_img_balance_sel_png);    // assets/balance_sel.png    
 
+
+#define NAV_ICON_NUM 8
 
 // UI INIT
 void ui_init(void);
 void ui_destroy(void);
 void ui_relocalize(void);
+
+void ui_draw_navigation_bar(lv_obj_t * parent);
+void ui_navigation_bar_destroy(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

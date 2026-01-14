@@ -11,11 +11,6 @@ static lv_obj_t * ui_Image_device = NULL;
 
 extern void _ui_common_screen_change(uint16_t cur_screen_id, lv_event_t * e);
 
-// event funtions
-void ui_event_Screen6(lv_event_t * e)
-{
-    _ui_common_screen_change(5, e);
-}
 
 // build funtions
 
@@ -24,15 +19,20 @@ void ui_Screen6_screen_init(void)
     ui_Screen6 = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screen6, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
+    // 设置背景色为深蓝色
+    lv_obj_set_style_bg_color(ui_Screen6, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_Screen6, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(ui_Screen6, 1920, 1200);    
+
     ui_Image_device = lv_img_create(ui_Screen6);
     lv_img_set_src(ui_Image_device, &ui_img_device_png);
     lv_obj_set_width(ui_Image_device, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Image_device, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_align(ui_Image_device, LV_ALIGN_CENTER);
+    lv_obj_set_align(ui_Image_device, LV_ALIGN_TOP_LEFT);
     lv_obj_add_flag(ui_Image_device, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Image_device, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-
-    lv_obj_add_event_cb(ui_Screen6, ui_event_Screen6, LV_EVENT_ALL, NULL);
+    ui_draw_navigation_bar(ui_Screen6);
+    // lv_obj_add_event_cb(ui_Screen6, ui_event_Screen6, LV_EVENT_ALL, NULL);
 
 }
 
@@ -43,6 +43,7 @@ void ui_Screen6_screen_destroy(void)
     // NULL screen variables
     ui_Screen6 = NULL;
     ui_Image_device = NULL;
+    ui_navigation_bar_destroy();
 
 }
 

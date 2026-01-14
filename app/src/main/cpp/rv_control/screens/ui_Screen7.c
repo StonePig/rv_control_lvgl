@@ -7,33 +7,233 @@
 
 lv_obj_t * ui_Screen7 = NULL;
 
-static lv_obj_t * ui_Image_light = NULL;
+// 灯光开关控件（使用图片）
+static lv_obj_t * ui_img_switch_bedroom = NULL;
+static lv_obj_t * ui_img_switch_living = NULL;
+static lv_obj_t * ui_img_switch_outdoor = NULL;
+static lv_obj_t * ui_img_switch_reading = NULL;
+static lv_obj_t * ui_img_switch_cockpit = NULL;
+
+// 开关状态
+static bool switch_state_bedroom = true;  // 默认开启
+static bool switch_state_living = false;
+static bool switch_state_outdoor = false;
+static bool switch_state_reading = false;
+static bool switch_state_cockpit = false;
+
+// 标签控件
+static lv_obj_t * ui_label_bedroom = NULL;
+static lv_obj_t * ui_label_living = NULL;
+static lv_obj_t * ui_label_outdoor = NULL;
+static lv_obj_t * ui_label_reading = NULL;
+static lv_obj_t * ui_label_cockpit = NULL;
+static lv_obj_t * ui_label_brightness = NULL;
+static lv_obj_t * ui_label_color_temp = NULL;
+
+// 滑块控件
+static lv_obj_t * ui_slider_brightness = NULL;
+static lv_obj_t * ui_slider_color_temp = NULL;
+
+
 
 extern void _ui_common_screen_change(uint16_t cur_screen_id, lv_event_t * e);
 
-// event funtions
-void ui_event_Screen7(lv_event_t * e)
+
+// 更新开关图片
+static void update_switch_image(lv_obj_t * img_obj, bool state)
 {
-    _ui_common_screen_change(6, e);
+    if(state) {
+        lv_img_set_src(img_obj, &ui_img_switch_on_png);
+    } else {
+        lv_img_set_src(img_obj, &ui_img_switch_off_png);
+    }
+}
+
+// 事件处理函数 - 切换开关状态
+static void light_switch_event_handler(lv_event_t * e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+    if(event_code == LV_EVENT_CLICKED) {
+        lv_obj_t * obj = lv_event_get_target(e);
+        
+        // 根据对象指针判断是哪个开关
+        if(obj == ui_img_switch_bedroom) {
+            switch_state_bedroom = !switch_state_bedroom;
+            update_switch_image(ui_img_switch_bedroom, switch_state_bedroom);
+        } else if(obj == ui_img_switch_living) {
+            switch_state_living = !switch_state_living;
+            update_switch_image(ui_img_switch_living, switch_state_living);
+        } else if(obj == ui_img_switch_outdoor) {
+            switch_state_outdoor = !switch_state_outdoor;
+            update_switch_image(ui_img_switch_outdoor, switch_state_outdoor);
+        } else if(obj == ui_img_switch_reading) {
+            switch_state_reading = !switch_state_reading;
+            update_switch_image(ui_img_switch_reading, switch_state_reading);
+        } else if(obj == ui_img_switch_cockpit) {
+            switch_state_cockpit = !switch_state_cockpit;
+            update_switch_image(ui_img_switch_cockpit, switch_state_cockpit);
+        }
+        
+        // TODO: 控制实际灯光
+    }
+}
+
+static void brightness_slider_event_handler(lv_event_t * e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+    if(event_code == LV_EVENT_VALUE_CHANGED) {
+        int32_t value = lv_slider_get_value(ui_slider_brightness);
+        // TODO: 更新亮度值
+    }
+}
+
+static void color_temp_slider_event_handler(lv_event_t * e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+    if(event_code == LV_EVENT_VALUE_CHANGED) {
+        int32_t value = lv_slider_get_value(ui_slider_color_temp);
+        // TODO: 更新色温值
+    }
 }
 
 // build funtions
+// static lv_obj_t * ui_Image_light;
+
+#define FONT_TYPE lv_font_montserrat_36
 
 void ui_Screen7_screen_init(void)
 {
     ui_Screen7 = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_Screen7, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_clear_flag(ui_Screen7, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置背景色为深蓝色
+    lv_obj_set_style_bg_color(ui_Screen7, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_Screen7, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(ui_Screen7, 1920, 1200);
 
-    ui_Image_light = lv_img_create(ui_Screen7);
-    lv_img_set_src(ui_Image_light, &ui_img_light_png);
-    lv_obj_set_width(ui_Image_light, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Image_light, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_align(ui_Image_light, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_Image_light, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_obj_clear_flag(ui_Image_light, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    lv_obj_add_event_cb(ui_Screen7, ui_event_Screen7, LV_EVENT_ALL, NULL);
-
+    // 创建左侧灯光开关区域
+    int switch_y_start = 250;
+    int switch_spacing = 120;
+    int switch_x = 200;
+    int switch_x_spacing = 350;
+    
+    // Bedroom Light
+    ui_label_bedroom = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_bedroom, "Bedroom Light");
+    lv_obj_set_style_text_color(ui_label_bedroom, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_bedroom, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_bedroom, switch_x, switch_y_start);
+    
+    ui_img_switch_bedroom = lv_img_create(ui_Screen7);
+    lv_obj_set_pos(ui_img_switch_bedroom, switch_x + switch_x_spacing, switch_y_start);
+    update_switch_image(ui_img_switch_bedroom, switch_state_bedroom);
+    lv_obj_add_flag(ui_img_switch_bedroom, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(ui_img_switch_bedroom, light_switch_event_handler, LV_EVENT_CLICKED, NULL);
+    
+    // Living Room Light
+    ui_label_living = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_living, "Living Room Light");
+    lv_obj_set_style_text_color(ui_label_living, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_living, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_living, switch_x, switch_y_start + switch_spacing);
+    
+    ui_img_switch_living = lv_img_create(ui_Screen7);
+    lv_obj_set_pos(ui_img_switch_living, switch_x + switch_x_spacing, switch_y_start + switch_spacing);
+    update_switch_image(ui_img_switch_living, switch_state_living);
+    lv_obj_add_flag(ui_img_switch_living, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(ui_img_switch_living, light_switch_event_handler, LV_EVENT_CLICKED, NULL);
+    
+    // Outdoor Light
+    ui_label_outdoor = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_outdoor, "Outdoor Light");
+    lv_obj_set_style_text_color(ui_label_outdoor, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_outdoor, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_outdoor, switch_x, switch_y_start + switch_spacing * 2);
+    
+    ui_img_switch_outdoor = lv_img_create(ui_Screen7);
+    lv_obj_set_pos(ui_img_switch_outdoor, switch_x + switch_x_spacing, switch_y_start + switch_spacing * 2);
+    update_switch_image(ui_img_switch_outdoor, switch_state_outdoor);
+    lv_obj_add_flag(ui_img_switch_outdoor, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(ui_img_switch_outdoor, light_switch_event_handler, LV_EVENT_CLICKED, NULL);
+    
+    // Reading Light
+    ui_label_reading = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_reading, "Reading Light");
+    lv_obj_set_style_text_color(ui_label_reading, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_reading, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_reading, switch_x, switch_y_start + switch_spacing * 3);
+    
+    ui_img_switch_reading = lv_img_create(ui_Screen7);
+    lv_obj_set_pos(ui_img_switch_reading, switch_x + switch_x_spacing, switch_y_start + switch_spacing * 3);
+    update_switch_image(ui_img_switch_reading, switch_state_reading);
+    lv_obj_add_flag(ui_img_switch_reading, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(ui_img_switch_reading, light_switch_event_handler, LV_EVENT_CLICKED, NULL);
+    
+    // Cockpit Light
+    ui_label_cockpit = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_cockpit, "Cockpit Light");
+    lv_obj_set_style_text_color(ui_label_cockpit, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_cockpit, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_cockpit, switch_x, switch_y_start + switch_spacing * 4);
+    
+    ui_img_switch_cockpit = lv_img_create(ui_Screen7);
+    lv_obj_set_pos(ui_img_switch_cockpit, switch_x + switch_x_spacing, switch_y_start + switch_spacing * 4);
+    update_switch_image(ui_img_switch_cockpit, switch_state_cockpit);
+    lv_obj_add_flag(ui_img_switch_cockpit, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(ui_img_switch_cockpit, light_switch_event_handler, LV_EVENT_CLICKED, NULL);
+    
+    // 创建右侧滑块区域
+    int slider_x = 1000;
+    int slider_y_start = 250;
+    int slider_spacing = 150;
+    
+    // Brightness Slider
+    ui_label_brightness = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_brightness, "Brightness");
+    lv_obj_set_style_text_color(ui_label_brightness, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_brightness, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_brightness, slider_x, slider_y_start);
+    
+    ui_slider_brightness = lv_slider_create(ui_Screen7);
+    lv_obj_set_pos(ui_slider_brightness, slider_x, slider_y_start + 50);
+    lv_obj_set_size(ui_slider_brightness, 700, 20);
+    lv_slider_set_range(ui_slider_brightness, 0, 100);
+    lv_slider_set_value(ui_slider_brightness, 70, LV_ANIM_OFF);
+    lv_obj_add_event_cb(ui_slider_brightness, brightness_slider_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    
+    // 设置亮度滑块的滑块颜色为浅黄色
+    // lv_obj_set_style_bg_color(ui_slider_brightness, lv_color_hex(0xFFFF99), LV_PART_KNOB | LV_STATE_DEFAULT);
+    
+    // Color Temperature Slider
+    ui_label_color_temp = lv_label_create(ui_Screen7);
+    lv_label_set_text(ui_label_color_temp, "Color Temperature");
+    lv_obj_set_style_text_color(ui_label_color_temp, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_color_temp, &FONT_TYPE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(ui_label_color_temp, slider_x, slider_y_start + slider_spacing);
+    
+    ui_slider_color_temp = lv_slider_create(ui_Screen7);
+    lv_obj_set_pos(ui_slider_color_temp, slider_x, slider_y_start + slider_spacing + 50);
+    lv_obj_set_size(ui_slider_color_temp, 700, 20);
+    lv_slider_set_range(ui_slider_color_temp, 0, 100);
+    lv_slider_set_value(ui_slider_color_temp, 75, LV_ANIM_OFF);
+    lv_obj_add_event_cb(ui_slider_color_temp, color_temp_slider_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    
+    // 设置色温滑块的滑块颜色为浅黄色
+    lv_obj_set_style_bg_color(ui_slider_color_temp, lv_color_hex(0xFFFF99), LV_PART_KNOB | LV_STATE_DEFAULT);
+    
+    // 设置色温滑块渐变色（从冷色到暖色：浅蓝->绿->黄/橙）
+    // 设置滑块背景渐变色（整个滑块轨道）
+    lv_obj_set_style_bg_color(ui_slider_color_temp, lv_color_hex(0x87CEEB), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(ui_slider_color_temp, lv_color_hex(0xFFA500), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(ui_slider_color_temp, LV_GRAD_DIR_HOR, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // 设置指示器颜色（已选择部分）
+    lv_obj_set_style_bg_color(ui_slider_color_temp, lv_color_hex(0x87CEEB), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(ui_slider_color_temp, lv_color_hex(0xFFA500), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(ui_slider_color_temp, LV_GRAD_DIR_HOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    
+    ui_draw_navigation_bar(ui_Screen7);
+    // lv_obj_add_event_cb(ui_Screen7, ui_event_Screen7, LV_EVENT_ALL, NULL);
 }
 
 void ui_Screen7_screen_destroy(void)
@@ -42,12 +242,31 @@ void ui_Screen7_screen_destroy(void)
 
     // NULL screen variables
     ui_Screen7 = NULL;
-    ui_Image_light = NULL;
-
+    ui_img_switch_bedroom = NULL;
+    ui_img_switch_living = NULL;
+    ui_img_switch_outdoor = NULL;
+    ui_img_switch_reading = NULL;
+    ui_img_switch_cockpit = NULL;
+    ui_label_bedroom = NULL;
+    ui_label_living = NULL;
+    ui_label_outdoor = NULL;
+    ui_label_reading = NULL;
+    ui_label_cockpit = NULL;
+    ui_label_brightness = NULL;
+    ui_label_color_temp = NULL;
+    ui_slider_brightness = NULL;
+    ui_slider_color_temp = NULL;
+    ui_navigation_bar_destroy();
 }
 
 void ui_Screen7_screen_relocalize(void)
 {
     // label widgets on screen
-
+    if(ui_label_bedroom) lv_label_set_text(ui_label_bedroom, "Bedroom Light");
+    if(ui_label_living) lv_label_set_text(ui_label_living, "Living Room Light");
+    if(ui_label_outdoor) lv_label_set_text(ui_label_outdoor, "Outdoor Light");
+    if(ui_label_reading) lv_label_set_text(ui_label_reading, "Reading Light");
+    if(ui_label_cockpit) lv_label_set_text(ui_label_cockpit, "Cockpit Light");
+    if(ui_label_brightness) lv_label_set_text(ui_label_brightness, "Brightness");
+    if(ui_label_color_temp) lv_label_set_text(ui_label_color_temp, "Color Temperature");
 }
