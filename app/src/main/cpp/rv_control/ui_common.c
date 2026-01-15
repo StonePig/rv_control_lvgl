@@ -1,15 +1,36 @@
 #include "ui.h"
 
-typedef void (*ui_screen_init_t)(void);
+typedef void (*ui_screen_func_t)(void);
 
 // 底部导航栏图标
 static lv_obj_t *ui_nav_icons[NAV_ICON_NUM] = {NULL};
 static lv_obj_t *highlight[NAV_ICON_NUM] = {NULL};
+static lv_obj_t *container = NULL;
 
 lv_obj_t *ui_Screen[] = {&ui_Screen1, &ui_Screen2, &ui_Screen3, &ui_Screen4, &ui_Screen5, &ui_Screen6, &ui_Screen7, &ui_Screen8};
 
-ui_screen_init_t ui_Screen_init_cb[] = {&ui_Screen1_screen_init, &ui_Screen2_screen_init, &ui_Screen3_screen_init, &ui_Screen4_screen_init, &ui_Screen5_screen_init, &ui_Screen6_screen_init, &ui_Screen7_screen_init, &ui_Screen8_screen_init};
+ui_screen_func_t ui_Screen_init_cb[] = {&ui_Screen1_screen_init, &ui_Screen2_screen_init, &ui_Screen3_screen_init, &ui_Screen4_screen_init, &ui_Screen5_screen_init, &ui_Screen6_screen_init, &ui_Screen7_screen_init, &ui_Screen8_screen_init};
+ui_screen_func_t ui_Screen_destroy_cb[] = {&ui_Screen1_screen_destroy, &ui_Screen2_screen_destroy, &ui_Screen3_screen_destroy, &ui_Screen4_screen_destroy, &ui_Screen5_screen_destroy, &ui_Screen6_screen_destroy, &ui_Screen7_screen_destroy, &ui_Screen8_screen_destroy};
+ui_screen_func_t ui_Screen_relocalize_cb[] = {ui_Screen1_screen_relocalize, ui_Screen2_screen_relocalize, ui_Screen3_screen_relocalize, ui_Screen4_screen_relocalize, ui_Screen5_screen_relocalize, ui_Screen6_screen_relocalize, ui_Screen7_screen_relocalize, ui_Screen8_screen_relocalize};
 
+// 创建显示容器
+lv_obj_t * ui_create_display_container(lv_obj_t *parent, lv_color_t bg_color, uint16_t x, uint16_t y, uint16_t width, uint16_t height)
+{
+    container = lv_obj_create(parent);
+    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(container, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(container, width, height);
+    lv_obj_set_pos(container, x, y);
+    lv_obj_set_style_bg_color(container, bg_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(container, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(container, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // lv_obj_move_background(container);
+    /* 去掉可见边框 */
+    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_opa(container, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_outline_opa(container, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    return container;
+}
 
 void bar_navi_event(lv_event_t *e)
 {
@@ -24,6 +45,7 @@ void bar_navi_event(lv_event_t *e)
     if (index >= 0 && index < NAV_ICON_NUM)
     {
         _ui_screen_change(ui_Screen[index], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[index]);
+        ui_Screen_relocalize_cb[index]();
     }
 }
 
@@ -74,34 +96,26 @@ void ui_draw_navigation_bar(lv_obj_t *parent)
         &ui_img_camera_unsel_png     // 摄像头
     };    
 
+    // 设置背景色为深蓝色
+    lv_obj_set_style_bg_color(parent, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_size(parent, SCREEN_DISPLAY_WIDTH, SCREEN_DISPLAY_HEIGHT);
+
     for (int i = 0; i < NAV_ICON_NUM; i++)
     {
         if (is_navi_index_selected(i, parent))
         {
             dsc = nav_icons_sel[i];
-            bg_color = lv_color_hex(0x189FBF);
+            bg_color = COLOR_HIGHLIGHT;
         }
         else
         {
             dsc = nav_icons[i];
-            bg_color = lv_color_hex(0x141432);
+            bg_color = COLOR_NORMAL;
         }
 
-        highlight[i] = lv_obj_create(parent);
+        highlight[i] = ui_create_display_container(parent, bg_color, i * nav_icon_width + 9, nav_y, nav_icon_width - 18, nav_icon_size);
         lv_obj_set_user_data(highlight[i], (void*)i);
-        lv_obj_clear_flag(highlight[i], LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_add_flag(highlight[i], LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_size(highlight[i], nav_icon_width - 18, nav_icon_size);
-        lv_obj_set_pos(highlight[i], i * nav_icon_width + 9, nav_y);
-        lv_obj_set_style_bg_color(highlight[i], bg_color, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_opa(highlight[i], LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_radius(highlight[i], 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_move_background(highlight[i]);
-        /* 去掉可见边框 */
-        lv_obj_set_style_border_width(highlight[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_opa(highlight[i], LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_outline_opa(highlight[i], LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-
         lv_obj_add_event_cb(highlight[i], bar_navi_event, LV_EVENT_ALL, NULL);
 
         ui_nav_icons[i] = lv_img_create(highlight[i]);

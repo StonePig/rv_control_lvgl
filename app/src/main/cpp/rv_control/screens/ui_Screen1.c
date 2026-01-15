@@ -5,47 +5,212 @@
 
 #include "../ui.h"
 
-lv_obj_t * ui_Screen1 = NULL;
-static lv_obj_t * ui_Imagehomepage = NULL;
+#include <time.h>
+#include <sys/time.h>
+#include <stdio.h>
 
-extern void _ui_common_screen_change(uint16_t cur_screen_id, lv_event_t * e);
+lv_obj_t *ui_Screen1 = NULL;
+static lv_obj_t *cur_ui_screen = NULL;
+static lv_obj_t *ui_Imagehomepage = NULL;
+
+// 系统时间显示控件
+#define TIME_CONTAINER_WIDTH 516
+#define TIME_CONTAINER_HEIGHT 324
+#define TIME_CONTAINER_X 13
+#define TIME_CONTAINER_Y 194
+static lv_obj_t *time_container = NULL;
+static lv_obj_t *time_label = NULL;
+static lv_obj_t *date_label = NULL;
+
+// 温湿度显示控件
+#define TEMP_HUMIDITY_CONTAINER_WIDTH 830
+#define TEMP_HUMIDITY_CONTAINER_HEIGHT 496
+#define TEMP_HUMIDITY_CONTAINER_X 545
+#define TEMP_HUMIDITY_CONTAINER_Y 167
+static lv_obj_t *temp_humidity_container = NULL;
+static lv_obj_t *temp_label = NULL;
+static lv_obj_t *humidity_label = NULL;
+
+// 车内外选择显示控件
+#define INSIDE_OUTSIDE_CONTAINER_WIDTH TEMP_HUMIDITY_CONTAINER_WIDTH / 2
+#define INSIDE_OUTSIDE_CONTAINER_HEIGHT 280
+#define INSIDE_OUTSIDE_CONTAINER_X TEMP_HUMIDITY_CONTAINER_X
+#define INSIDE_OUTSIDE_CONTAINER_Y (TEMP_HUMIDITY_CONTAINER_Y + TEMP_HUMIDITY_CONTAINER_HEIGHT + 20)
+static lv_obj_t *inside_container = NULL;
+static lv_obj_t *outside_container = NULL;
+static lv_obj_t *inside_image = NULL;
+static lv_obj_t *outside_image = NULL;
+
+
+static void ui_inside_outside_update_display(void)
+{
+    if (app_ctx.is_inside_mode)
+    {
+        lv_img_set_src(inside_image, &ui_img_inside_sel_png);
+        lv_img_set_src(outside_image, &ui_img_outside_unsel_png);
+        lv_obj_set_style_bg_color(inside_container, COLOR_HIGHLIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(outside_container, COLOR_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    else
+    {
+        lv_img_set_src(inside_image, &ui_img_inside_unsel_png);
+        lv_img_set_src(outside_image, &ui_img_outside_sel_png);
+        lv_obj_set_style_bg_color(inside_container, COLOR_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(outside_container, COLOR_HIGHLIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+}
+
+// 车内外选择事件处理函数
+static void inside_outside_event_handler(lv_event_t *e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+    if (event_code == LV_EVENT_CLICKED)
+    {
+        lv_obj_t *obj = lv_event_get_target(e);
+        void *user_data = lv_obj_get_user_data(obj);
+        if (user_data == (void *)0)
+        { // Inside selected
+            app_ctx.is_inside_mode = true;
+        }
+        else if (user_data == (void *)1)
+        { // Outside selected
+            app_ctx.is_inside_mode = false;
+        }
+        // 更新显示
+        ui_inside_outside_update_display();
+    }
+}
+
+static void update_time_task(lv_timer_t *timer)
+{
+    ui_Screen1_screen_relocalize();
+}
 
 // build funtions
 void ui_Screen1_screen_init(void)
 {
-    ui_Screen1 = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    cur_ui_screen = lv_obj_create(NULL);
+    ui_Screen1 = cur_ui_screen;
+    lv_obj_clear_flag(cur_ui_screen, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    // 设置背景色为深蓝色
-    lv_obj_set_style_bg_color(ui_Screen1, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_Screen1, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_size(ui_Screen1, 1920, 1200);    
-
-    ui_Imagehomepage = lv_img_create(ui_Screen1);
+    ui_Imagehomepage = lv_img_create(cur_ui_screen);
     lv_img_set_src(ui_Imagehomepage, &ui_img_homepage_png);
-    lv_obj_set_width(ui_Imagehomepage, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Imagehomepage, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_width(ui_Imagehomepage, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(ui_Imagehomepage, LV_SIZE_CONTENT); /// 1
     lv_obj_set_align(ui_Imagehomepage, LV_ALIGN_TOP_LEFT);
-    lv_obj_add_flag(ui_Imagehomepage, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_obj_clear_flag(ui_Imagehomepage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_add_flag(ui_Imagehomepage, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
+    lv_obj_clear_flag(ui_Imagehomepage, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    ui_draw_navigation_bar(ui_Screen1);
+    // 创建时间显示容器
+    lv_obj_t * time_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, TIME_CONTAINER_X, TIME_CONTAINER_Y, TIME_CONTAINER_WIDTH, TIME_CONTAINER_HEIGHT);
+    // 创建日期标签
+    date_label = lv_label_create(time_container);
+    time_t current_time;
+    time(&current_time);
+    // 转换为本地时间字符串
+    struct tm *local_time = localtime(&current_time);
+    char time_str[64];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d", local_time);
+    lv_label_set_text(date_label, time_str);
+    lv_obj_set_style_text_color(date_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(date_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(date_label, LV_ALIGN_TOP_MID);
+    lv_obj_set_style_pad_top(date_label, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // 创建时间标签
+    time_label = lv_label_create(time_container);
+    strftime(time_str, sizeof(time_str), "%H:%M", local_time);
+    lv_label_set_text(time_label, time_str);
+    lv_obj_set_style_text_color(time_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(time_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(time_label, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_style_pad_bottom(time_label, 20, LV_PART_MAIN | LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // 创建温湿度显示容器
+    temp_humidity_container = ui_create_display_container(cur_ui_screen, COLOR_HIGHLIGHT, TEMP_HUMIDITY_CONTAINER_X, TEMP_HUMIDITY_CONTAINER_Y, TEMP_HUMIDITY_CONTAINER_WIDTH, TEMP_HUMIDITY_CONTAINER_HEIGHT);  
+    // 创建温度标签
+    temp_label = lv_label_create(temp_humidity_container);
+    lv_label_set_text(temp_label, "25");
+    lv_obj_set_style_text_color(temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // lv_obj_set_style_text_font(temp_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(temp_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(temp_label, LV_ALIGN_LEFT_MID);
+    lv_obj_set_style_pad_left(temp_label, 80, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // 创建湿度标签
+    humidity_label = lv_label_create(temp_humidity_container);
+    lv_label_set_text(humidity_label, "60");
+    lv_obj_set_style_text_color(humidity_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(humidity_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(humidity_label, LV_ALIGN_RIGHT_MID);
+    lv_obj_set_style_pad_right(humidity_label, 80, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // 根据当前模式设置车内外选择状态
+    const lv_img_dsc_t *inside_img_dsc;
+    const lv_img_dsc_t *outside_img_dsc;
+    lv_color_t inside_bg_color;
+    lv_color_t outside_bg_color;
+    if (app_ctx.is_inside_mode)
+    {
+        inside_img_dsc = &ui_img_inside_sel_png;
+        outside_img_dsc = &ui_img_outside_unsel_png;
+        inside_bg_color = COLOR_HIGHLIGHT;
+        outside_bg_color = COLOR_NORMAL;
+    }
+    else
+    {
+        inside_img_dsc = &ui_img_inside_unsel_png;
+        outside_img_dsc = &ui_img_outside_sel_png;
+        inside_bg_color = COLOR_NORMAL;
+        outside_bg_color = COLOR_HIGHLIGHT;
+    }
+    // 创建车内外选择容器
+    inside_container = ui_create_display_container(cur_ui_screen, inside_bg_color, INSIDE_OUTSIDE_CONTAINER_X, INSIDE_OUTSIDE_CONTAINER_Y, INSIDE_OUTSIDE_CONTAINER_WIDTH, INSIDE_OUTSIDE_CONTAINER_HEIGHT);
+    // 创建车内图片
+    inside_image = lv_img_create(inside_container);
+    lv_img_set_src(inside_image, inside_img_dsc);
+    lv_obj_set_width(inside_image, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(inside_image, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_align(inside_image, LV_ALIGN_CENTER);
+    lv_img_set_zoom(inside_image, 180); 
+    lv_obj_set_user_data(inside_container, (void *)0); // 0 for inside
+    lv_obj_add_event_cb(inside_container, inside_outside_event_handler, LV_EVENT_CLICKED, NULL);
+
+    outside_container = ui_create_display_container(cur_ui_screen, outside_bg_color, INSIDE_OUTSIDE_CONTAINER_X + INSIDE_OUTSIDE_CONTAINER_WIDTH, INSIDE_OUTSIDE_CONTAINER_Y, INSIDE_OUTSIDE_CONTAINER_WIDTH, INSIDE_OUTSIDE_CONTAINER_HEIGHT);
+    outside_image = lv_img_create(outside_container);
+    lv_img_set_src(outside_image, outside_img_dsc);
+    lv_obj_set_width(outside_image, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(outside_image, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_align(outside_image, LV_ALIGN_CENTER);
+    lv_img_set_zoom(outside_image, 180); 
+    lv_obj_set_user_data(outside_container, (void *)1); // 1 for outside
+    lv_obj_add_event_cb(outside_container, inside_outside_event_handler, LV_EVENT_CLICKED, NULL);
+
+    //启动一个定时器每分钟更新一次时间显示
+    lv_timer_create(update_time_task, 1000, NULL);
+
+    ui_draw_navigation_bar(cur_ui_screen);
 }
 
 void ui_Screen1_screen_destroy(void)
 {
-    if(ui_Screen1) lv_obj_del(ui_Screen1);
-
-    // NULL screen variables
-    ui_Screen1 = NULL;
-    ui_Imagehomepage = NULL;
+    if (cur_ui_screen)
+        lv_obj_del(cur_ui_screen);
 
     ui_navigation_bar_destroy();
-
 }
 
 void ui_Screen1_screen_relocalize(void)
 {
     // label widgets on screen
-
+    if (cur_ui_screen)
+    {
+        // 更新时间显示
+        time_t current_time;
+        time(&current_time);
+        struct tm *local_time = localtime(&current_time);
+        char time_str[64];
+        strftime(time_str, sizeof(time_str), "%Y-%m-%d", local_time);
+        lv_label_set_text(date_label, time_str);
+        strftime(time_str, sizeof(time_str), "%H:%M", local_time);
+        lv_label_set_text(time_label, time_str);
+    }
 }

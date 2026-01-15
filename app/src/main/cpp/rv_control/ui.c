@@ -21,6 +21,10 @@ lv_obj_t * ui____initial_actions0;
     #error "LV_COLOR_16_SWAP should be 0 to match SquareLine Studio's settings"
 #endif
 
+app_context_t app_ctx = {
+    .is_inside_mode = true, // Default to inside mode
+};
+
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////

@@ -62,9 +62,30 @@ LV_IMG_DECLARE(ui_img_light_sel_png);    // assets/light_sel.png
 LV_IMG_DECLARE(ui_img_setting_sel_png);    // assets/setting_sel.png
 LV_IMG_DECLARE(ui_img_camera_sel_png);    // assets/camera_sel.png
 LV_IMG_DECLARE(ui_img_balance_sel_png);    // assets/balance_sel.png    
+LV_IMG_DECLARE(ui_img_inside_unsel_png);
+LV_IMG_DECLARE(ui_img_inside_sel_png);
+LV_IMG_DECLARE(ui_img_outside_sel_png);
+LV_IMG_DECLARE(ui_img_outside_unsel_png);
 
+
+LV_FONT_DECLARE(ui_font_Number_big);
+LV_FONT_DECLARE(ui_font_Number_extra);
 
 #define NAV_ICON_NUM 8
+#define SCREEN_DISPLAY_WIDTH 1920
+#define SCREEN_DISPLAY_HEIGHT 1200
+
+// 各种控件的颜色定义
+#define COLOR_BG_DARK lv_color_hex(0x0)
+#define COLOR_LABLE_WHITE lv_color_hex(0xFFFFFF)
+#define COLOR_HIGHLIGHT lv_color_hex(0x189FBF)
+#define COLOR_NORMAL lv_color_hex(0x141432)
+
+typedef struct {
+    bool is_inside_mode; // true for inside, false for outside
+} app_context_t;
+
+extern app_context_t app_ctx;
 
 // UI INIT
 void ui_init(void);
@@ -73,6 +94,7 @@ void ui_relocalize(void);
 
 void ui_draw_navigation_bar(lv_obj_t * parent);
 void ui_navigation_bar_destroy(void);
+lv_obj_t *ui_create_display_container(lv_obj_t *parent, lv_color_t bg_color, uint16_t x, uint16_t y, uint16_t width, uint16_t height);
 
 #ifdef __cplusplus
 } /*extern "C"*/
