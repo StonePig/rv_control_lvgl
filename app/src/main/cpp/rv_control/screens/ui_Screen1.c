@@ -8,6 +8,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <string.h>
 
 lv_obj_t *ui_Screen1 = NULL;
 static lv_obj_t *cur_ui_screen = NULL;
@@ -21,6 +22,13 @@ static lv_obj_t *ui_Imagehomepage = NULL;
 static lv_obj_t *time_container = NULL;
 static lv_obj_t *time_label = NULL;
 static lv_obj_t *date_label = NULL;
+
+// 日历显示控件
+#define CALENDAR_CONTAINER_WIDTH TIME_CONTAINER_WIDTH
+#define CALENDAR_CONTAINER_HEIGHT 340
+#define CALENDAR_CONTAINER_X TIME_CONTAINER_X
+#define CALENDAR_CONTAINER_Y (TIME_CONTAINER_Y + TIME_CONTAINER_HEIGHT + 20)
+static lv_obj_t *calendar = NULL;
 
 // 温湿度显示控件
 #define TEMP_HUMIDITY_CONTAINER_WIDTH 830
@@ -41,6 +49,15 @@ static lv_obj_t *outside_container = NULL;
 static lv_obj_t *inside_image = NULL;
 static lv_obj_t *outside_image = NULL;
 
+// 天气显示控件
+#define WEATHER_CONTAINER_WIDTH 500
+#define WEATHER_CONTAINER_HEIGHT 800
+#define WEATHER_CONTAINER_X TEMP_HUMIDITY_CONTAINER_X + TEMP_HUMIDITY_CONTAINER_WIDTH + 20
+#define WEATHER_CONTAINER_Y TEMP_HUMIDITY_CONTAINER_Y
+static lv_obj_t *weather_container = NULL;
+static lv_obj_t *weather_icon = NULL;
+static lv_obj_t *weather_temp_label = NULL;
+static lv_obj_t *weather_desc_label = NULL;
 
 static void ui_inside_outside_update_display(void)
 {
@@ -78,6 +95,7 @@ static void inside_outside_event_handler(lv_event_t *e)
         }
         // 更新显示
         ui_inside_outside_update_display();
+        ui_Screen1_screen_relocalize();
     }
 }
 
@@ -93,43 +111,45 @@ void ui_Screen1_screen_init(void)
     ui_Screen1 = cur_ui_screen;
     lv_obj_clear_flag(cur_ui_screen, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    ui_Imagehomepage = lv_img_create(cur_ui_screen);
-    lv_img_set_src(ui_Imagehomepage, &ui_img_homepage_png);
-    lv_obj_set_width(ui_Imagehomepage, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_Imagehomepage, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_align(ui_Imagehomepage, LV_ALIGN_TOP_LEFT);
-    lv_obj_add_flag(ui_Imagehomepage, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
-    lv_obj_clear_flag(ui_Imagehomepage, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+    // ui_Imagehomepage = lv_img_create(cur_ui_screen);
+    // lv_img_set_src(ui_Imagehomepage, &ui_img_homepage_png);
+    // lv_obj_set_width(ui_Imagehomepage, LV_SIZE_CONTENT);  /// 1
+    // lv_obj_set_height(ui_Imagehomepage, LV_SIZE_CONTENT); /// 1
+    // lv_obj_set_align(ui_Imagehomepage, LV_ALIGN_TOP_LEFT);
+    // lv_obj_add_flag(ui_Imagehomepage, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
+    // lv_obj_clear_flag(ui_Imagehomepage, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
     // 创建时间显示容器
     lv_obj_t * time_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, TIME_CONTAINER_X, TIME_CONTAINER_Y, TIME_CONTAINER_WIDTH, TIME_CONTAINER_HEIGHT);
     // 创建日期标签
     date_label = lv_label_create(time_container);
-    time_t current_time;
-    time(&current_time);
-    // 转换为本地时间字符串
-    struct tm *local_time = localtime(&current_time);
-    char time_str[64];
-    strftime(time_str, sizeof(time_str), "%Y-%m-%d", local_time);
-    lv_label_set_text(date_label, time_str);
     lv_obj_set_style_text_color(date_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(date_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(date_label, LV_ALIGN_TOP_MID);
     lv_obj_set_style_pad_top(date_label, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
     // 创建时间标签
     time_label = lv_label_create(time_container);
-    strftime(time_str, sizeof(time_str), "%H:%M", local_time);
-    lv_label_set_text(time_label, time_str);
     lv_obj_set_style_text_color(time_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(time_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(time_label, LV_ALIGN_BOTTOM_MID);
     lv_obj_set_style_pad_bottom(time_label, 20, LV_PART_MAIN | LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    //创建日历容器
+    lv_obj_t * calendar_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CALENDAR_CONTAINER_X, CALENDAR_CONTAINER_Y, CALENDAR_CONTAINER_WIDTH, CALENDAR_CONTAINER_HEIGHT);
+    // 创建日历控件
+    calendar = lv_calendar_create(calendar_container);
+    lv_obj_set_size(calendar, CALENDAR_CONTAINER_WIDTH - 20, CALENDAR_CONTAINER_HEIGHT - 20);
+    lv_obj_set_align(calendar, LV_ALIGN_CENTER);
+    // 设置日历样式 
+    lv_obj_set_style_text_color(calendar, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(calendar, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(calendar, COLOR_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(calendar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   
     // 创建温湿度显示容器
     temp_humidity_container = ui_create_display_container(cur_ui_screen, COLOR_HIGHLIGHT, TEMP_HUMIDITY_CONTAINER_X, TEMP_HUMIDITY_CONTAINER_Y, TEMP_HUMIDITY_CONTAINER_WIDTH, TEMP_HUMIDITY_CONTAINER_HEIGHT);  
     // 创建温度标签
     temp_label = lv_label_create(temp_humidity_container);
-    lv_label_set_text(temp_label, "25");
     lv_obj_set_style_text_color(temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     // lv_obj_set_style_text_font(temp_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(temp_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -137,7 +157,6 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_style_pad_left(temp_label, 80, LV_PART_MAIN | LV_STATE_DEFAULT);
     // 创建湿度标签
     humidity_label = lv_label_create(temp_humidity_container);
-    lv_label_set_text(humidity_label, "60");
     lv_obj_set_style_text_color(humidity_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(humidity_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(humidity_label, LV_ALIGN_RIGHT_MID);
@@ -184,6 +203,32 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_user_data(outside_container, (void *)1); // 1 for outside
     lv_obj_add_event_cb(outside_container, inside_outside_event_handler, LV_EVENT_CLICKED, NULL);
 
+    // 创建天气显示容器
+    weather_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, WEATHER_CONTAINER_X, WEATHER_CONTAINER_Y, WEATHER_CONTAINER_WIDTH, WEATHER_CONTAINER_HEIGHT);
+    // 创建天气图标
+    // weather_icon = lv_img_create(weather_container);
+    // lv_img_set_src(weather_icon, &ui_img_weather_sunny_png);
+    // lv_obj_set_width(weather_icon, LV_SIZE_CONTENT);  /// 1
+    // lv_obj_set_height(weather_icon, LV_SIZE_CONTENT); /// 1
+    // lv_obj_set_align(weather_icon, LV_ALIGN_LEFT_MID);
+    // lv_img_set_zoom(weather_icon, 200); 
+    // lv_obj_set_style_pad_left(weather_icon, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // 创建天气温度标签
+    weather_temp_label = lv_label_create(weather_container);
+    lv_label_set_text(weather_temp_label, "28°C");
+    lv_obj_set_style_text_color(weather_temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(weather_temp_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(weather_temp_label, LV_ALIGN_CENTER);
+    // 创建天气描述标签
+    weather_desc_label = lv_label_create(weather_container);
+    lv_label_set_text(weather_desc_label, "Sunny");
+    lv_obj_set_style_text_color(weather_desc_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(weather_desc_label, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(weather_desc_label, LV_ALIGN_RIGHT_MID);
+    lv_obj_set_style_pad_right(weather_desc_label, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_Screen1_screen_relocalize();
+
     //启动一个定时器每分钟更新一次时间显示
     lv_timer_create(update_time_task, 1000, NULL);
 
@@ -212,5 +257,25 @@ void ui_Screen1_screen_relocalize(void)
         lv_label_set_text(date_label, time_str);
         strftime(time_str, sizeof(time_str), "%H:%M", local_time);
         lv_label_set_text(time_label, time_str);
+
+        lv_calendar_set_today_date(calendar, local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday); // 设置今天日期，实际应用中应动态获取当前日期
+        lv_calendar_set_showed_date(calendar, local_time->tm_year + 1900, local_time->tm_mon + 1); // 设置显示的月份，实际应用中应动态获取当前月份
+        lv_calendar_date_t highlighted_dates;
+        highlighted_dates.year = local_time->tm_year + 1900;
+        highlighted_dates.month = local_time->tm_mon + 1;
+        highlighted_dates.day = local_time->tm_mday;
+        lv_calendar_set_highlighted_dates(calendar, &highlighted_dates, 1);
+
+        if(app_ctx.is_inside_mode)
+        {
+            lv_label_set_text_fmt(temp_label, "%d", app_ctx.inside_temperature);
+            lv_label_set_text_fmt(humidity_label, "%d", app_ctx.inside_humidity);
+        }
+        else
+        {
+            lv_label_set_text_fmt(temp_label, "%d", app_ctx.outside_temperature);
+            lv_label_set_text_fmt(humidity_label, "%d", app_ctx.outside_humidity);
+        }
+
     }
 }

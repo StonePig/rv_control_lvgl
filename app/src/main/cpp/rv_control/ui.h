@@ -83,6 +83,10 @@ LV_FONT_DECLARE(ui_font_Number_extra);
 
 typedef struct {
     bool is_inside_mode; // true for inside, false for outside
+    uint16_t inside_temperature;
+    uint16_t outside_temperature;
+    uint16_t inside_humidity;
+    uint16_t outside_humidity;
 } app_context_t;
 
 extern app_context_t app_ctx;

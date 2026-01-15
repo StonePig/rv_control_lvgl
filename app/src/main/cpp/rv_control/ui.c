@@ -6,6 +6,8 @@
 #include "ui.h"
 #include "ui_helpers.h"
 
+#include "../serial_port.h"
+
 ///////////////////// VARIABLES ////////////////////
 
 // EVENTS
@@ -23,13 +25,29 @@ lv_obj_t * ui____initial_actions0;
 
 app_context_t app_ctx = {
     .is_inside_mode = true, // Default to inside mode
+    .inside_humidity = 70,
+    .outside_humidity = 90,
+    .inside_temperature = 23,
+    .outside_temperature = 28
 };
+
+static int s_serial_fd = -1;
 
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////
 
 ///////////////////// SCREENS ////////////////////
+
+static void serial_data_cb(const uint8_t *data, size_t len)
+{
+    // serial_write(s_serial_fd, "1234", strlen("1234"));
+
+    if (!data || len <= 0)
+        return;
+
+    app_ctx.inside_humidity = data[0] << 8 | data[1];
+}
 
 void ui_init(void)
 {
@@ -47,6 +65,16 @@ void ui_init(void)
     ui_Screen8_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_Screen1);
+
+    // ---- Serial example: open /dev/ttyS1 and start reader ----
+    
+    s_serial_fd = serial_open("/dev/ttyS1", 115200);
+    if (s_serial_fd >= 0)
+    {
+        const char *test = "rv app version 1.0\n";
+        serial_write(s_serial_fd, test, strlen(test));
+        serial_start_reader(s_serial_fd, serial_data_cb);
+    }    
 }
 
 void ui_destroy(void)
