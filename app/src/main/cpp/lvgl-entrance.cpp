@@ -70,7 +70,7 @@ static void copy_px(uint8_t *data, lv_color_t *color_p, int w) {
 static uint32_t *buf;
 
 static void window_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
-    __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s,%d,%d", __func__,WIDTH,HEIGHT);
+    // __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s,%d,%d", __func__,WIDTH,HEIGHT);
     int left = area->x1;
     if (left < 0)
         left = 0;

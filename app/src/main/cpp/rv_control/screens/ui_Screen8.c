@@ -4,50 +4,224 @@
 // Project name: SquareLine_Project
 
 #include "../ui.h"
+#include <stdlib.h>
+#include <string.h>
+
+// forward to bridge implemented in camera_bridge.cpp
+void camera_bridge_request_start(void);
+void camera_bridge_request_stop(void);
 
 lv_obj_t * ui_Screen8 = NULL;
+static lv_obj_t *cur_ui_screen = NULL;
 
 static lv_obj_t * ui_Image_camera = NULL;
+static lv_img_dsc_t * ui_camera_img = NULL;
+static uint8_t * ui_camera_data = NULL;
 
-extern void _ui_common_screen_change(uint16_t cur_screen_id, lv_event_t * e);
+// 3个camera预览小窗口
+#define CAMERA_PREVIEW_WIDTH 320
+#define CAMERA_PREVIEW_HEIGHT 240
+#define CAMERA_PREVIEW_1_X 50
+#define CAMERA_PREVIEW_1_Y 80
+#define CAMERA_PREVIEW_2_X CAMERA_PREVIEW_1_X
+#define CAMERA_PREVIEW_2_Y CAMERA_PREVIEW_1_Y + CAMERA_PREVIEW_HEIGHT + 30
+#define CAMERA_PREVIEW_3_X CAMERA_PREVIEW_1_X
+#define CAMERA_PREVIEW_3_Y CAMERA_PREVIEW_2_Y + CAMERA_PREVIEW_HEIGHT + 30
+static lv_obj_t * ui_Image_camera_preview_container_1 = NULL;
+static lv_obj_t * ui_Image_camera_preview_container_2 = NULL;
+static lv_obj_t * ui_Image_camera_preview_container_3 = NULL;
+static lv_obj_t * ui_Image_camera_preview_1 = NULL;
+static lv_obj_t * ui_Image_camera_preview_2 = NULL;
+static lv_obj_t * ui_Image_camera_preview_3 = NULL;
+static lv_obj_t * camera_1_label = NULL;
+static lv_obj_t * camera_2_label = NULL;
+static lv_obj_t * camera_3_label = NULL;
+
+// cmaera预览图像数据
+#define CAMERA_PREVIEW_IMAGE_WIDTH 1280
+#define CAMERA_PREVIEW_IMAGE_HEIGHT 960
+#define CAMERA_PREVIEW_X 500
+#define CAMERA_PREVIEW_Y 10
+static lv_obj_t * ui_Image_camera_preview_container = NULL;
+static lv_obj_t * ui_Image_camera_preview = NULL;
+static lv_obj_t * camera_preview_label = NULL;
+
+
+// event handlers
+static void camera_preview_event_handler(lv_event_t *e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+    if (event_code == LV_EVENT_CLICKED)
+    {
+        lv_obj_t *obj = lv_event_get_target(e);
+        void *user_data = lv_obj_get_user_data(obj);
+        if (user_data == (void *)0)
+        { // Camera 1 selected
+            app_ctx.camera_id = 0;
+        }
+        else if (user_data == (void *)1)
+        { // Camera 2 selected
+            app_ctx.camera_id = 1;
+        }
+        else if (user_data == (void *)2)
+        { // Camera 3 selected
+            app_ctx.camera_id = 2;
+        }
+        ui_Screen8_screen_relocalize();
+    }
+}
 
 // build funtions
 
 void ui_Screen8_screen_init(void)
 {
-    ui_Screen8 = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_Screen8, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    cur_ui_screen = lv_obj_create(NULL);
+    ui_Screen8 = cur_ui_screen;
+    lv_obj_clear_flag(cur_ui_screen, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    // 设置背景色为深蓝色
-    lv_obj_set_style_bg_color(ui_Screen8, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_Screen8, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_size(ui_Screen8, 1920, 1200);    
+    ui_Image_camera_preview_container_1 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
+    ui_Image_camera_preview_container_2 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_2_X, CAMERA_PREVIEW_2_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
+    ui_Image_camera_preview_container_3 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
+    ui_Image_camera_preview_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_X, CAMERA_PREVIEW_Y, CAMERA_PREVIEW_IMAGE_WIDTH, CAMERA_PREVIEW_IMAGE_HEIGHT);
 
-    ui_Image_camera = lv_img_create(ui_Screen8);
-    lv_img_set_src(ui_Image_camera, &ui_img_camera_png);
-    lv_obj_set_width(ui_Image_camera, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Image_camera, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_align(ui_Image_camera, LV_ALIGN_TOP_LEFT);
-    lv_obj_add_flag(ui_Image_camera, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_obj_clear_flag(ui_Image_camera, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    ui_draw_navigation_bar(ui_Screen8);
-    // lv_obj_add_event_cb(ui_Screen8, ui_event_Screen8, LV_EVENT_ALL, NULL);
+    lv_obj_set_user_data(ui_Image_camera_preview_container_1, (void *)0); // 0 for inside
+    lv_obj_add_event_cb(ui_Image_camera_preview_container_1, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_user_data(ui_Image_camera_preview_container_2, (void *)1); // 1 for outside
+    lv_obj_add_event_cb(ui_Image_camera_preview_container_2, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_user_data(ui_Image_camera_preview_container_3, (void *)2); // 2 for outside
+    lv_obj_add_event_cb(ui_Image_camera_preview_container_3, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
+
+    ui_Image_camera_preview_1 = lv_img_create(ui_Image_camera_preview_container_1);
+    lv_obj_set_pos(ui_Image_camera_preview_1, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y);
+    lv_obj_set_width(ui_Image_camera_preview_1, CAMERA_PREVIEW_WIDTH);   /// 1
+    lv_obj_set_height(ui_Image_camera_preview_1, CAMERA_PREVIEW_HEIGHT);    /// 1
+    lv_obj_set_align(ui_Image_camera_preview_1, LV_ALIGN_CENTER);
+    camera_1_label = lv_label_create(ui_Image_camera_preview_container_1);
+    lv_label_set_text(camera_1_label, "Camera 1");
+    lv_obj_set_style_text_color(camera_1_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(camera_1_label, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(camera_1_label, LV_ALIGN_TOP_LEFT);
+    lv_obj_set_style_pad_left(camera_1_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_Image_camera_preview_2 = lv_img_create(ui_Image_camera_preview_container_2);
+    lv_obj_set_pos(ui_Image_camera_preview_2, CAMERA_PREVIEW_2_X, CAMERA_PREVIEW_2_Y);
+    lv_obj_set_width(ui_Image_camera_preview_2, CAMERA_PREVIEW_WIDTH);   /// 1
+    lv_obj_set_height(ui_Image_camera_preview_2, CAMERA_PREVIEW_HEIGHT);    /// 1
+    lv_obj_set_align(ui_Image_camera_preview_2, LV_ALIGN_CENTER);
+    camera_2_label = lv_label_create(ui_Image_camera_preview_container_2);
+    lv_label_set_text(camera_2_label, "Camera 2");
+    lv_obj_set_style_text_color(camera_2_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(camera_2_label, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(camera_2_label, LV_ALIGN_TOP_LEFT);
+    lv_obj_set_style_pad_left(camera_2_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    
+    ui_Image_camera_preview_3 = lv_img_create(ui_Image_camera_preview_container_3);
+    lv_obj_set_pos(ui_Image_camera_preview_3, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y);
+    lv_obj_set_width(ui_Image_camera_preview_3, CAMERA_PREVIEW_WIDTH);   /// 1
+    lv_obj_set_height(ui_Image_camera_preview_3, CAMERA_PREVIEW_HEIGHT);    /// 1
+    lv_obj_set_align(ui_Image_camera_preview_3, LV_ALIGN_CENTER);
+    camera_3_label = lv_label_create(ui_Image_camera_preview_container_3);
+    lv_label_set_text(camera_3_label, "Camera 3");
+    lv_obj_set_style_text_color(camera_3_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(camera_3_label, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(camera_3_label, LV_ALIGN_TOP_LEFT);
+    lv_obj_set_style_pad_left(camera_3_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_Image_camera_preview = lv_img_create(ui_Image_camera_preview_container);
+    lv_obj_set_pos(ui_Image_camera_preview, CAMERA_PREVIEW_X, CAMERA_PREVIEW_Y);
+    lv_obj_set_width(ui_Image_camera_preview, CAMERA_PREVIEW_IMAGE_WIDTH);   /// 1
+    lv_obj_set_height(ui_Image_camera_preview, CAMERA_PREVIEW_IMAGE_HEIGHT);    /// 1
+    lv_obj_set_align(ui_Image_camera_preview, LV_ALIGN_CENTER);
+    lv_obj_add_flag(ui_Image_camera_preview, LV_OBJ_FLAG_CLICKABLE);     /// Flags
+    lv_obj_clear_flag(ui_Image_camera_preview, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    camera_preview_label = lv_label_create(ui_Image_camera_preview_container);
+    lv_label_set_text_fmt(camera_preview_label, "Camera %d", app_ctx.camera_id + 1);
+    lv_obj_set_style_text_color(camera_preview_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(camera_preview_label, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(camera_preview_label, LV_ALIGN_TOP_LEFT);
+    lv_obj_set_style_pad_left(camera_preview_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    
+    ui_draw_navigation_bar(cur_ui_screen);
+    // 请求 Java 层启动摄像头采集（如果可用）
+    camera_bridge_request_start();
 
 }
 
 void ui_Screen8_screen_destroy(void)
 {
-    if(ui_Screen8) lv_obj_del(ui_Screen8);
+    if(cur_ui_screen) lv_obj_del(cur_ui_screen);
 
     // NULL screen variables
-    ui_Screen8 = NULL;
+    cur_ui_screen = NULL;
     ui_Image_camera = NULL;
     ui_navigation_bar_destroy();
+    // 请求停止摄像头
+    camera_bridge_request_stop();
+
+    if (ui_camera_img) {
+        free(ui_camera_img);
+        ui_camera_img = NULL;
+    }
+    if (ui_camera_data) {
+        free(ui_camera_data);
+        ui_camera_data = NULL;
+    }
 
 }
 
 void ui_Screen8_screen_relocalize(void)
 {
     // label widgets on screen
+    lv_label_set_text_fmt(camera_preview_label, "Camera %d", app_ctx.camera_id + 1);
 
+}
+
+// Called from native bridge when a new RGBA frame is available
+void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h)
+{
+    if (!ui_Image_camera_preview_1 || !rgba || w <= 0 || h <= 0) return;
+
+    size_t sz = (size_t)w * (size_t)h * 4;
+
+    if (!ui_camera_img) {
+        ui_camera_img = (lv_img_dsc_t*)malloc(sizeof(lv_img_dsc_t));
+        memset(ui_camera_img, 0, sizeof(lv_img_dsc_t));
+    }
+
+    if (!ui_camera_data || (size_t)(ui_camera_img->header.w * ui_camera_img->header.h * 4) < sz) {
+        if (ui_camera_data) free(ui_camera_data);
+        ui_camera_data = (uint8_t*)malloc(sz);
+    }
+
+    memcpy(ui_camera_data, rgba, sz);
+
+    ui_camera_img->header.w = w;
+    ui_camera_img->header.h = h;
+    ui_camera_img->header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+    ui_camera_img->data_size = sz;
+    ui_camera_img->data = ui_camera_data;
+
+    // update LVGL image source
+    lv_img_set_src(ui_Image_camera_preview_1, ui_camera_img);
+    lv_obj_set_size(ui_Image_camera_preview_1, w, h);
+    lv_img_set_zoom(ui_Image_camera_preview_1, 256 / 2);
+    lv_obj_align(ui_Image_camera_preview_1, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_invalidate(ui_Image_camera_preview_1);
+
+    lv_img_set_src(ui_Image_camera_preview, ui_camera_img);
+    lv_obj_set_size(ui_Image_camera_preview, w, h);
+    lv_img_set_zoom(ui_Image_camera_preview, 256 * 2);
+    lv_obj_align(ui_Image_camera_preview, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_invalidate(ui_Image_camera_preview);    
+}
+
+// wrappers declared in header
+void ui_Screen8_request_camera_start(void)
+{
+    camera_bridge_request_start();
+}
+
+void ui_Screen8_request_camera_stop(void)
+{
+    camera_bridge_request_stop();
 }

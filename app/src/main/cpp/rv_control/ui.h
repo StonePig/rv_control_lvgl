@@ -70,6 +70,7 @@ LV_IMG_DECLARE(ui_img_outside_unsel_png);
 
 LV_FONT_DECLARE(ui_font_Number_big);
 LV_FONT_DECLARE(ui_font_Number_extra);
+LV_FONT_DECLARE(ui_font_Number_digital7);
 
 #define NAV_ICON_NUM 8
 #define SCREEN_DISPLAY_WIDTH 1920
@@ -87,6 +88,7 @@ typedef struct {
     uint16_t outside_temperature;
     uint16_t inside_humidity;
     uint16_t outside_humidity;
+    uint8_t camera_id; // 当前使用的摄像头ID
 } app_context_t;
 
 extern app_context_t app_ctx;

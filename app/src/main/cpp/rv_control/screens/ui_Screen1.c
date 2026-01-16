@@ -152,13 +152,13 @@ void ui_Screen1_screen_init(void)
     temp_label = lv_label_create(temp_humidity_container);
     lv_obj_set_style_text_color(temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     // lv_obj_set_style_text_font(temp_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(temp_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(temp_label, &ui_font_Number_digital7, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(temp_label, LV_ALIGN_LEFT_MID);
     lv_obj_set_style_pad_left(temp_label, 80, LV_PART_MAIN | LV_STATE_DEFAULT);
     // 创建湿度标签
     humidity_label = lv_label_create(temp_humidity_container);
     lv_obj_set_style_text_color(humidity_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(humidity_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(humidity_label, &ui_font_Number_digital7, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(humidity_label, LV_ALIGN_RIGHT_MID);
     lv_obj_set_style_pad_right(humidity_label, 80, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -217,15 +217,15 @@ void ui_Screen1_screen_init(void)
     weather_temp_label = lv_label_create(weather_container);
     lv_label_set_text(weather_temp_label, "28°C");
     lv_obj_set_style_text_color(weather_temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(weather_temp_label, &ui_font_Number_extra, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(weather_temp_label, &ui_font_Number_digital7, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(weather_temp_label, LV_ALIGN_CENTER);
     // 创建天气描述标签
     weather_desc_label = lv_label_create(weather_container);
     lv_label_set_text(weather_desc_label, "Sunny");
     lv_obj_set_style_text_color(weather_desc_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(weather_desc_label, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(weather_desc_label, &lv_font_montserrat_40, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(weather_desc_label, LV_ALIGN_RIGHT_MID);
-    lv_obj_set_style_pad_right(weather_desc_label, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(weather_desc_label, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_Screen1_screen_relocalize();
 
@@ -239,6 +239,8 @@ void ui_Screen1_screen_destroy(void)
 {
     if (cur_ui_screen)
         lv_obj_del(cur_ui_screen);
+    
+    cur_ui_screen = NULL;
 
     ui_navigation_bar_destroy();
 }
@@ -268,13 +270,13 @@ void ui_Screen1_screen_relocalize(void)
 
         if(app_ctx.is_inside_mode)
         {
-            lv_label_set_text_fmt(temp_label, "%d", app_ctx.inside_temperature);
-            lv_label_set_text_fmt(humidity_label, "%d", app_ctx.inside_humidity);
+            lv_label_set_text_fmt(temp_label, "%d°C", app_ctx.inside_temperature);
+            lv_label_set_text_fmt(humidity_label, "%d%%", app_ctx.inside_humidity);
         }
         else
         {
-            lv_label_set_text_fmt(temp_label, "%d", app_ctx.outside_temperature);
-            lv_label_set_text_fmt(humidity_label, "%d", app_ctx.outside_humidity);
+            lv_label_set_text_fmt(temp_label, "%d°C", app_ctx.outside_temperature);
+            lv_label_set_text_fmt(humidity_label, "%d%%", app_ctx.outside_humidity);
         }
 
     }
