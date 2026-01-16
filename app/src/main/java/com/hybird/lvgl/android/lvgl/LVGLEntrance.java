@@ -17,5 +17,5 @@ public class LVGLEntrance {
     public static native void nativeTouch(int x, int y, boolean touch);
 
     // Called from Java camera code to deliver RGBA frame bytes to native
-    public static native void nativeCameraFrame(byte[] rgba, int width, int height);
+    public static native void nativeCameraFrame(byte[] rgba, int width, int height, int camIndex);
 }

@@ -16,10 +16,10 @@ extern void ui_Screen8_screen_destroy(void);
 extern void ui_Screen8_screen_relocalize(void);
 extern void ui_event_Screen8(lv_event_t * e);
 extern lv_obj_t * ui_Screen8;
-// Camera control API for Screen8
-extern void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h);
-extern void ui_Screen8_request_camera_start(void);
-extern void ui_Screen8_request_camera_stop(void);
+// Camera control API for Screen8 (support multiple cameras)
+extern void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h, int cam_index);
+extern void ui_Screen8_request_camera_start(int cam_index);
+extern void ui_Screen8_request_camera_stop(int cam_index);
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

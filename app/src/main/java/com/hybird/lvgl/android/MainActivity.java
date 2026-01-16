@@ -39,9 +39,9 @@ public class MainActivity extends AppCompatActivity {
     private static MainActivity instance;
 
     // Camera2
-    private CameraDevice cameraDevice;
-    private CameraCaptureSession captureSession;
-    private ImageReader imageReader;
+    private CameraDevice[] cameraDevices = new CameraDevice[3];
+    private CameraCaptureSession[] captureSessions = new CameraCaptureSession[3];
+    private ImageReader[] imageReaders = new ImageReader[3];
     private HandlerThread cameraThread;
     private Handler cameraHandler;
 
@@ -62,7 +62,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopCamera();
+        // stop all cameras
+        for (int i = 0; i < 3; i++) stopCamera(i);
         instance = null;
     }
 
@@ -100,41 +101,46 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setAttributes(params);
     }
 
-    // Called from native bridge to request camera start
-    public static void startCamera() {
+    // Called from native bridge to request camera start for index
+    public static void startCamera(int index) {
         MainActivity a = getInstance();
-        if (a != null) a._startCameraInternal();
+        if (a != null) a._startCameraInternal(index);
     }
 
-    // Called from native bridge to request camera stop
-    public static void stopCamera() {
+    // Called from native bridge to request camera stop for index
+    public static void stopCamera(int index) {
         MainActivity a = getInstance();
-        if (a != null) a._stopCameraInternal();
+        if (a != null) a._stopCameraInternal(index);
     }
 
-    private void _startCameraInternal() {
+    private void _startCameraInternal(int index) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 1001);
             return;
         }
+        if (cameraDevices[index] != null) return;
 
-        if (cameraDevice != null) return;
-
-        cameraThread = new HandlerThread("CameraThread");
-        cameraThread.start();
-        cameraHandler = new Handler(cameraThread.getLooper());
+        if (cameraThread == null) {
+            cameraThread = new HandlerThread("CameraThread");
+            cameraThread.start();
+            cameraHandler = new Handler(cameraThread.getLooper());
+        }
 
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            String cameraId = manager.getCameraIdList()[0];
-            imageReader = ImageReader.newInstance(640, 480, ImageFormat.YUV_420_888, 2);
-            imageReader.setOnImageAvailableListener(reader -> {
+            String[] ids = manager.getCameraIdList();
+            if (index < 0 || index >= ids.length) return;
+            String cameraId = ids[index];
+
+            imageReaders[index] = ImageReader.newInstance(640, 480, ImageFormat.YUV_420_888, 2);
+            final int camIdx = index;
+            imageReaders[index].setOnImageAvailableListener(reader -> {
                 Image image = reader.acquireLatestImage();
                 if (image == null) return;
                 byte[] rgba = yuv420ToRgba(image);
                 image.close();
                 if (rgba != null) {
-                    LVGLEntrance.nativeCameraFrame(rgba, 640, 480);
+                    LVGLEntrance.nativeCameraFrame(rgba, 640, 480, camIdx);
                 }
             }, cameraHandler);
 
@@ -144,15 +150,15 @@ public class MainActivity extends AppCompatActivity {
             manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(CameraDevice camera) {
-                    cameraDevice = camera;
+                    cameraDevices[camIdx] = camera;
                     try {
-                        Surface surface = imageReader.getSurface();
-                        final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                        Surface surface = imageReaders[camIdx].getSurface();
+                        final CaptureRequest.Builder builder = cameraDevices[camIdx].createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                         builder.addTarget(surface);
-                        cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
+                        cameraDevices[camIdx].createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
                             @Override
                             public void onConfigured(CameraCaptureSession session) {
-                                captureSession = session;
+                                captureSessions[camIdx] = session;
                                 try {
                                     session.setRepeatingRequest(builder.build(), null, cameraHandler);
                                 } catch (CameraAccessException e) {
@@ -173,13 +179,13 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onDisconnected(CameraDevice camera) {
                     camera.close();
-                    cameraDevice = null;
+                    cameraDevices[camIdx] = null;
                 }
 
                 @Override
                 public void onError(CameraDevice camera, int error) {
                     camera.close();
-                    cameraDevice = null;
+                    cameraDevices[camIdx] = null;
                 }
             }, cameraHandler);
 
@@ -188,20 +194,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void _stopCameraInternal() {
-        if (captureSession != null) {
-            try { captureSession.close(); } catch (Exception e) {}
-            captureSession = null;
+    private void _stopCameraInternal(int index) {
+        if (index < 0 || index >= 3) return;
+        if (captureSessions[index] != null) {
+            try { captureSessions[index].close(); } catch (Exception e) {}
+            captureSessions[index] = null;
         }
-        if (cameraDevice != null) {
-            try { cameraDevice.close(); } catch (Exception e) {}
-            cameraDevice = null;
+        if (cameraDevices[index] != null) {
+            try { cameraDevices[index].close(); } catch (Exception e) {}
+            cameraDevices[index] = null;
         }
-        if (imageReader != null) {
-            try { imageReader.close(); } catch (Exception e) {}
-            imageReader = null;
+        if (imageReaders[index] != null) {
+            try { imageReaders[index].close(); } catch (Exception e) {}
+            imageReaders[index] = null;
         }
-        if (cameraThread != null) {
+
+        // if all cameras stopped, stop thread
+        boolean any = false;
+        for (int i = 0; i < 3; i++) if (cameraDevices[i] != null) any = true;
+        if (!any && cameraThread != null) {
             cameraThread.quitSafely();
             cameraThread = null;
             cameraHandler = null;

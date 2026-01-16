@@ -8,8 +8,8 @@
 #include <string.h>
 
 // forward to bridge implemented in camera_bridge.cpp
-void camera_bridge_request_start(void);
-void camera_bridge_request_stop(void);
+void camera_bridge_request_start(int index);
+void camera_bridge_request_stop(int index);
 
 lv_obj_t * ui_Screen8 = NULL;
 static lv_obj_t *cur_ui_screen = NULL;
@@ -142,8 +142,10 @@ void ui_Screen8_screen_init(void)
     lv_obj_set_style_pad_left(camera_preview_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
     
     ui_draw_navigation_bar(cur_ui_screen);
-    // 请求 Java 层启动摄像头采集（如果可用）
-    camera_bridge_request_start();
+    // 请求 Java 层启动三个摄像头采集（如果可用）
+    camera_bridge_request_start(0);
+    camera_bridge_request_start(1);
+    camera_bridge_request_start(2);
 
 }
 
@@ -155,8 +157,10 @@ void ui_Screen8_screen_destroy(void)
     cur_ui_screen = NULL;
     ui_Image_camera = NULL;
     ui_navigation_bar_destroy();
-    // 请求停止摄像头
-    camera_bridge_request_stop();
+    // 请求停止三个摄像头
+    camera_bridge_request_stop(0);
+    camera_bridge_request_stop(1);
+    camera_bridge_request_stop(2);
 
     if (ui_camera_img) {
         free(ui_camera_img);
@@ -176,52 +180,66 @@ void ui_Screen8_screen_relocalize(void)
 
 }
 
-// Called from native bridge when a new RGBA frame is available
-void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h)
+// Called from native bridge when a new RGBA frame is available for camera index
+void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h, int cam_index)
 {
-    if (!ui_Image_camera_preview_1 || !rgba || w <= 0 || h <= 0) return;
-
+    if (!rgba || w <= 0 || h <= 0) return;
+    
     size_t sz = (size_t)w * (size_t)h * 4;
 
-    if (!ui_camera_img) {
-        ui_camera_img = (lv_img_dsc_t*)malloc(sizeof(lv_img_dsc_t));
-        memset(ui_camera_img, 0, sizeof(lv_img_dsc_t));
+    // allocate per-camera image descriptor and buffer on first use
+    static lv_img_dsc_t *cam_img[3] = {NULL, NULL, NULL};
+    static uint8_t *cam_buf[3] = {NULL, NULL, NULL};
+
+    if (cam_index < 0 || cam_index >= 3) return;
+
+    if (!cam_img[cam_index]) {
+        cam_img[cam_index] = (lv_img_dsc_t*)malloc(sizeof(lv_img_dsc_t));
+        memset(cam_img[cam_index], 0, sizeof(lv_img_dsc_t));
     }
 
-    if (!ui_camera_data || (size_t)(ui_camera_img->header.w * ui_camera_img->header.h * 4) < sz) {
-        if (ui_camera_data) free(ui_camera_data);
-        ui_camera_data = (uint8_t*)malloc(sz);
+    if (!cam_buf[cam_index] || (size_t)(cam_img[cam_index]->header.w * cam_img[cam_index]->header.h * 4) < sz) {
+        if (cam_buf[cam_index]) free(cam_buf[cam_index]);
+        cam_buf[cam_index] = (uint8_t*)malloc(sz);
     }
 
-    memcpy(ui_camera_data, rgba, sz);
+    memcpy(cam_buf[cam_index], rgba, sz);
 
-    ui_camera_img->header.w = w;
-    ui_camera_img->header.h = h;
-    ui_camera_img->header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
-    ui_camera_img->data_size = sz;
-    ui_camera_img->data = ui_camera_data;
+    cam_img[cam_index]->header.w = w;
+    cam_img[cam_index]->header.h = h;
+    cam_img[cam_index]->header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+    cam_img[cam_index]->data_size = sz;
+    cam_img[cam_index]->data = cam_buf[cam_index];
 
-    // update LVGL image source
-    lv_img_set_src(ui_Image_camera_preview_1, ui_camera_img);
-    lv_obj_set_size(ui_Image_camera_preview_1, w, h);
-    lv_img_set_zoom(ui_Image_camera_preview_1, 256 / 2);
-    lv_obj_align(ui_Image_camera_preview_1, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_invalidate(ui_Image_camera_preview_1);
+    lv_obj_t *target = NULL;
+    if (cam_index == 0) target = ui_Image_camera_preview_1;
+    else if (cam_index == 1) target = ui_Image_camera_preview_2;
+    else if (cam_index == 2) target = ui_Image_camera_preview_3;
+    if (target) {
+        lv_img_set_src(target, cam_img[cam_index]);
+        lv_obj_set_size(target, w, h);
+        lv_img_set_zoom(target, 256 / 2);
+        lv_obj_align(target, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_invalidate(target);
+    }
 
-    lv_img_set_src(ui_Image_camera_preview, ui_camera_img);
-    lv_obj_set_size(ui_Image_camera_preview, w, h);
-    lv_img_set_zoom(ui_Image_camera_preview, 256 * 2);
-    lv_obj_align(ui_Image_camera_preview, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_invalidate(ui_Image_camera_preview);    
+    // If this camera is the currently selected one, update the big preview
+    if (app_ctx.camera_id == cam_index && ui_Image_camera_preview) {
+        lv_img_set_src(ui_Image_camera_preview, cam_img[cam_index]);
+        lv_obj_set_size(ui_Image_camera_preview, w, h);
+        lv_img_set_zoom(ui_Image_camera_preview, 256 * 2);
+        lv_obj_align(ui_Image_camera_preview, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_invalidate(ui_Image_camera_preview);
+    }
 }
 
-// wrappers declared in header
-void ui_Screen8_request_camera_start(void)
+// wrappers declared in header (per-camera)
+void ui_Screen8_request_camera_start(int cam_index)
 {
-    camera_bridge_request_start();
+    camera_bridge_request_start(cam_index);
 }
 
-void ui_Screen8_request_camera_stop(void)
+void ui_Screen8_request_camera_stop(int cam_index)
 {
-    camera_bridge_request_stop();
+    camera_bridge_request_stop(cam_index);
 }
