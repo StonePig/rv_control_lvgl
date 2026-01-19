@@ -6,6 +6,8 @@
 #include "../ui.h"
 #include <stdlib.h>
 #include <string.h>
+#include <android/log.h>
+
 
 // forward to bridge implemented in camera_bridge.cpp
 void camera_bridge_request_start(int index);
@@ -33,6 +35,9 @@ static lv_obj_t * ui_Image_camera_preview_container_3 = NULL;
 static lv_obj_t * ui_Image_camera_preview_1 = NULL;
 static lv_obj_t * ui_Image_camera_preview_2 = NULL;
 static lv_obj_t * ui_Image_camera_preview_3 = NULL;
+// use canvas buffers for faster updates
+static void * cam_small_buf[3] = {NULL, NULL, NULL};
+static void * cam_big_buf = NULL;
 static lv_obj_t * camera_1_label = NULL;
 static lv_obj_t * camera_2_label = NULL;
 static lv_obj_t * camera_3_label = NULL;
@@ -91,11 +96,14 @@ void ui_Screen8_screen_init(void)
     lv_obj_set_user_data(ui_Image_camera_preview_container_3, (void *)2); // 2 for outside
     lv_obj_add_event_cb(ui_Image_camera_preview_container_3, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
 
-    ui_Image_camera_preview_1 = lv_img_create(ui_Image_camera_preview_container_1);
+    ui_Image_camera_preview_1 = lv_canvas_create(ui_Image_camera_preview_container_1);
     lv_obj_set_pos(ui_Image_camera_preview_1, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y);
-    lv_obj_set_width(ui_Image_camera_preview_1, CAMERA_PREVIEW_WIDTH);   /// 1
-    lv_obj_set_height(ui_Image_camera_preview_1, CAMERA_PREVIEW_HEIGHT);    /// 1
-    lv_obj_set_align(ui_Image_camera_preview_1, LV_ALIGN_CENTER);
+    lv_obj_set_width(ui_Image_camera_preview_1, CAMERA_PREVIEW_WIDTH);
+    lv_obj_set_height(ui_Image_camera_preview_1, CAMERA_PREVIEW_HEIGHT);
+    lv_obj_align(ui_Image_camera_preview_1, LV_ALIGN_CENTER, 0, 0);
+    // allocate small buffer (RGBA)
+    cam_small_buf[0] = malloc(CAMERA_PREVIEW_WIDTH * CAMERA_PREVIEW_HEIGHT * 4);
+    lv_canvas_set_buffer(ui_Image_camera_preview_1, cam_small_buf[0], CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT, LV_IMG_CF_TRUE_COLOR_ALPHA);
     camera_1_label = lv_label_create(ui_Image_camera_preview_container_1);
     lv_label_set_text(camera_1_label, "Camera 1");
     lv_obj_set_style_text_color(camera_1_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -103,11 +111,13 @@ void ui_Screen8_screen_init(void)
     lv_obj_set_align(camera_1_label, LV_ALIGN_TOP_LEFT);
     lv_obj_set_style_pad_left(camera_1_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_Image_camera_preview_2 = lv_img_create(ui_Image_camera_preview_container_2);
+    ui_Image_camera_preview_2 = lv_canvas_create(ui_Image_camera_preview_container_2);
     lv_obj_set_pos(ui_Image_camera_preview_2, CAMERA_PREVIEW_2_X, CAMERA_PREVIEW_2_Y);
-    lv_obj_set_width(ui_Image_camera_preview_2, CAMERA_PREVIEW_WIDTH);   /// 1
-    lv_obj_set_height(ui_Image_camera_preview_2, CAMERA_PREVIEW_HEIGHT);    /// 1
-    lv_obj_set_align(ui_Image_camera_preview_2, LV_ALIGN_CENTER);
+    lv_obj_set_width(ui_Image_camera_preview_2, CAMERA_PREVIEW_WIDTH);
+    lv_obj_set_height(ui_Image_camera_preview_2, CAMERA_PREVIEW_HEIGHT);
+    lv_obj_align(ui_Image_camera_preview_2, LV_ALIGN_CENTER, 0, 0);
+    cam_small_buf[1] = malloc(CAMERA_PREVIEW_WIDTH * CAMERA_PREVIEW_HEIGHT * 4);
+    lv_canvas_set_buffer(ui_Image_camera_preview_2, cam_small_buf[1], CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT, LV_IMG_CF_TRUE_COLOR_ALPHA);
     camera_2_label = lv_label_create(ui_Image_camera_preview_container_2);
     lv_label_set_text(camera_2_label, "Camera 2");
     lv_obj_set_style_text_color(camera_2_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -115,11 +125,13 @@ void ui_Screen8_screen_init(void)
     lv_obj_set_align(camera_2_label, LV_ALIGN_TOP_LEFT);
     lv_obj_set_style_pad_left(camera_2_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
     
-    ui_Image_camera_preview_3 = lv_img_create(ui_Image_camera_preview_container_3);
+    ui_Image_camera_preview_3 = lv_canvas_create(ui_Image_camera_preview_container_3);
     lv_obj_set_pos(ui_Image_camera_preview_3, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y);
-    lv_obj_set_width(ui_Image_camera_preview_3, CAMERA_PREVIEW_WIDTH);   /// 1
-    lv_obj_set_height(ui_Image_camera_preview_3, CAMERA_PREVIEW_HEIGHT);    /// 1
-    lv_obj_set_align(ui_Image_camera_preview_3, LV_ALIGN_CENTER);
+    lv_obj_set_width(ui_Image_camera_preview_3, CAMERA_PREVIEW_WIDTH);
+    lv_obj_set_height(ui_Image_camera_preview_3, CAMERA_PREVIEW_HEIGHT);
+    lv_obj_align(ui_Image_camera_preview_3, LV_ALIGN_CENTER, 0, 0);
+    cam_small_buf[2] = malloc(CAMERA_PREVIEW_WIDTH * CAMERA_PREVIEW_HEIGHT * 4);
+    lv_canvas_set_buffer(ui_Image_camera_preview_3, cam_small_buf[2], CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT, LV_IMG_CF_TRUE_COLOR_ALPHA);
     camera_3_label = lv_label_create(ui_Image_camera_preview_container_3);
     lv_label_set_text(camera_3_label, "Camera 3");
     lv_obj_set_style_text_color(camera_3_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -127,13 +139,15 @@ void ui_Screen8_screen_init(void)
     lv_obj_set_align(camera_3_label, LV_ALIGN_TOP_LEFT);
     lv_obj_set_style_pad_left(camera_3_label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_Image_camera_preview = lv_img_create(ui_Image_camera_preview_container);
+    ui_Image_camera_preview = lv_canvas_create(ui_Image_camera_preview_container);
     lv_obj_set_pos(ui_Image_camera_preview, CAMERA_PREVIEW_X, CAMERA_PREVIEW_Y);
-    lv_obj_set_width(ui_Image_camera_preview, CAMERA_PREVIEW_IMAGE_WIDTH);   /// 1
-    lv_obj_set_height(ui_Image_camera_preview, CAMERA_PREVIEW_IMAGE_HEIGHT);    /// 1
-    lv_obj_set_align(ui_Image_camera_preview, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_Image_camera_preview, LV_OBJ_FLAG_CLICKABLE);     /// Flags
-    lv_obj_clear_flag(ui_Image_camera_preview, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_set_width(ui_Image_camera_preview, CAMERA_PREVIEW_IMAGE_WIDTH);
+    lv_obj_set_height(ui_Image_camera_preview, CAMERA_PREVIEW_IMAGE_HEIGHT);
+    lv_obj_align(ui_Image_camera_preview, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(ui_Image_camera_preview, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(ui_Image_camera_preview, LV_OBJ_FLAG_SCROLLABLE);
+    cam_big_buf = malloc(CAMERA_PREVIEW_IMAGE_WIDTH * CAMERA_PREVIEW_IMAGE_HEIGHT * 4);
+    lv_canvas_set_buffer(ui_Image_camera_preview, cam_big_buf, CAMERA_PREVIEW_IMAGE_WIDTH, CAMERA_PREVIEW_IMAGE_HEIGHT, LV_IMG_CF_TRUE_COLOR_ALPHA);
     camera_preview_label = lv_label_create(ui_Image_camera_preview_container);
     lv_label_set_text_fmt(camera_preview_label, "Camera %d", app_ctx.camera_id + 1);
     lv_obj_set_style_text_color(camera_preview_label, COLOR_BG_DARK, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -144,8 +158,8 @@ void ui_Screen8_screen_init(void)
     ui_draw_navigation_bar(cur_ui_screen);
     // 请求 Java 层启动三个摄像头采集（如果可用）
     camera_bridge_request_start(0);
-    camera_bridge_request_start(1);
-    camera_bridge_request_start(2);
+    // camera_bridge_request_start(1);
+    // camera_bridge_request_start(2);
 
 }
 
@@ -162,6 +176,11 @@ void ui_Screen8_screen_destroy(void)
     camera_bridge_request_stop(1);
     camera_bridge_request_stop(2);
 
+    // free canvas buffers
+    for (int i = 0; i < 3; i++) {
+        if (cam_small_buf[i]) { free(cam_small_buf[i]); cam_small_buf[i] = NULL; }
+    }
+    if (cam_big_buf) { free(cam_big_buf); cam_big_buf = NULL; }
     if (ui_camera_img) {
         free(ui_camera_img);
         ui_camera_img = NULL;
@@ -179,15 +198,15 @@ void ui_Screen8_screen_relocalize(void)
     lv_label_set_text_fmt(camera_preview_label, "Camera %d", app_ctx.camera_id + 1);
 
 }
-
+static uint32_t last_refresh = 0, now_time;
 // Called from native bridge when a new RGBA frame is available for camera index
 void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h, int cam_index)
 {
     if (!rgba || w <= 0 || h <= 0) return;
-    
+   
     size_t sz = (size_t)w * (size_t)h * 4;
 
-    // allocate per-camera image descriptor and buffer on first use
+    // allocate per-camera image descriptor and buffer on first use (for compatibility)
     static lv_img_dsc_t *cam_img[3] = {NULL, NULL, NULL};
     static uint8_t *cam_buf[3] = {NULL, NULL, NULL};
 
@@ -203,34 +222,70 @@ void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h, int cam_i
         cam_buf[cam_index] = (uint8_t*)malloc(sz);
     }
 
-    memcpy(cam_buf[cam_index], rgba, sz);
-
-    cam_img[cam_index]->header.w = w;
-    cam_img[cam_index]->header.h = h;
-    cam_img[cam_index]->header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
-    cam_img[cam_index]->data_size = sz;
-    cam_img[cam_index]->data = cam_buf[cam_index];
-
-    lv_obj_t *target = NULL;
-    if (cam_index == 0) target = ui_Image_camera_preview_1;
-    else if (cam_index == 1) target = ui_Image_camera_preview_2;
-    else if (cam_index == 2) target = ui_Image_camera_preview_3;
-    if (target) {
-        lv_img_set_src(target, cam_img[cam_index]);
-        lv_obj_set_size(target, w, h);
-        lv_img_set_zoom(target, 256 / 2);
-        lv_obj_align(target, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_invalidate(target);
+    // downsample RGBA into a centered small region inside the full-size canvas (4x downscale: width/height divide by 4)
+    int small_w = CAMERA_PREVIEW_WIDTH;
+    int small_h = CAMERA_PREVIEW_HEIGHT;
+    if (cam_small_buf[cam_index]) {
+        uint8_t *dst = (uint8_t*)cam_small_buf[cam_index];
+        // clear full canvas
+        memset(dst, 0, CAMERA_PREVIEW_WIDTH * CAMERA_PREVIEW_HEIGHT * 4);
+        int offset_x = (CAMERA_PREVIEW_WIDTH - small_w) / 2;
+        int offset_y = (CAMERA_PREVIEW_HEIGHT - small_h) / 2;
+        for (int row = 0; row < small_h; row++) {
+            int src_row = row * 4;
+            for (int col = 0; col < small_w; col++) {
+                int src_col = col * 4;
+                uint8_t *dpx = dst + ((offset_y + row) * CAMERA_PREVIEW_WIDTH + (offset_x + col)) * 4;
+                if (src_row < h && src_col < w) {
+                    uint8_t *spx = (uint8_t*)rgba + (src_row * w + src_col) * 4;
+                    dpx[0] = spx[0]; dpx[1] = spx[1]; dpx[2] = spx[2]; dpx[3] = spx[3];
+                } else {
+                    dpx[0] = dpx[1] = dpx[2] = 0; dpx[3] = 0;
+                }
+            }
+        }
+        // invalidate small canvas
+        if (cam_index == 0) lv_obj_invalidate(ui_Image_camera_preview_1);
+        else if (cam_index == 1) lv_obj_invalidate(ui_Image_camera_preview_2);
+        else if (cam_index == 2) lv_obj_invalidate(ui_Image_camera_preview_3);
     }
 
-    // If this camera is the currently selected one, update the big preview
-    if (app_ctx.camera_id == cam_index && ui_Image_camera_preview) {
-        lv_img_set_src(ui_Image_camera_preview, cam_img[cam_index]);
-        lv_obj_set_size(ui_Image_camera_preview, w, h);
-        lv_img_set_zoom(ui_Image_camera_preview, 256 * 2);
-        lv_obj_align(ui_Image_camera_preview, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_invalidate(ui_Image_camera_preview);
+    // If selected, copy (or scale externally) into big canvas
+    if (app_ctx.camera_id == cam_index && cam_big_buf) {
+        // naive copy into top-left of big buffer (no scaling)
+        int big_w = CAMERA_PREVIEW_IMAGE_WIDTH;
+        int big_h = CAMERA_PREVIEW_IMAGE_HEIGHT;
+        int copy_big_w = (w < big_w) ? w : big_w;
+        int copy_big_h = (h < big_h) ? h : big_h;
+        for (int row = 0; row < copy_big_h; row++) {
+            memcpy((uint8_t*)cam_big_buf + row * big_w * 4,
+                   rgba + row * w * 4,
+                   copy_big_w * 4);
+            if (big_w > copy_big_w) {
+                memset((uint8_t*)cam_big_buf + row * big_w * 4 + copy_big_w * 4, 0, (big_w - copy_big_w) * 4);
+            }
+        }
+        // lv_obj_invalidate(ui_Image_camera_preview);
     }
+
+    uint32_t end_time = lv_tick_get();
+    uint32_t elapsed = end_time - last_refresh;   
+    __android_log_print(ANDROID_LOG_INFO, "screen8", "preview cam %d frame %dx%d, time %d ms", cam_index, w, h, elapsed);
+
+    // 计算ui_Screen8_update_camera_frame的执行时间
+    now_time = lv_tick_get();
+
+    // 避免过频繁刷新（硬件限制）
+    // if (now_time - last_refresh < 30) return; // 最短8ms间隔 (~120fps上限)
+    
+    // 立即处理渲染
+    // lv_refr_now(lv_disp_get_default());
+
+    // while(lv_disp_flush_is_last(lv_disp_get_default())) {
+    //     // 等待最后一帧完成
+    // }     
+    
+    
 }
 
 // wrappers declared in header (per-camera)

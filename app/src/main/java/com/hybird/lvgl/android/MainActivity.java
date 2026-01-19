@@ -132,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
             if (index < 0 || index >= ids.length) return;
             String cameraId = ids[index];
 
-            imageReaders[index] = ImageReader.newInstance(640, 480, ImageFormat.YUV_420_888, 2);
+            imageReaders[index] = ImageReader.newInstance(640*2, 480*2, ImageFormat.YUV_420_888, 2);
             final int camIdx = index;
             imageReaders[index].setOnImageAvailableListener(reader -> {
                 Image image = reader.acquireLatestImage();
@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
                 byte[] rgba = yuv420ToRgba(image);
                 image.close();
                 if (rgba != null) {
-                    LVGLEntrance.nativeCameraFrame(rgba, 640, 480, camIdx);
+                    LVGLEntrance.nativeCameraFrame(rgba, 640*2, 480*2, camIdx);
                 }
             }, cameraHandler);
 
