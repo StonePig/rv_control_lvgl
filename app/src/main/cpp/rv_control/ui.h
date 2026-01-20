@@ -101,6 +101,7 @@ void ui_relocalize(void);
 void ui_draw_navigation_bar(lv_obj_t * parent);
 void ui_navigation_bar_destroy(void);
 lv_obj_t *ui_create_display_container(lv_obj_t *parent, lv_color_t bg_color, uint16_t x, uint16_t y, uint16_t width, uint16_t height);
+void ui_draw_cur_screen(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

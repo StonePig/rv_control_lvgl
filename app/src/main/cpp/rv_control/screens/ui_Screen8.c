@@ -158,8 +158,8 @@ void ui_Screen8_screen_init(void)
     ui_draw_navigation_bar(cur_ui_screen);
     // 请求 Java 层启动三个摄像头采集（如果可用）
     camera_bridge_request_start(0);
-    // camera_bridge_request_start(1);
-    // camera_bridge_request_start(2);
+    camera_bridge_request_start(1);
+    camera_bridge_request_start(2);
 
 }
 
@@ -265,7 +265,7 @@ void ui_Screen8_update_camera_frame(const uint8_t *rgba, int w, int h, int cam_i
                 memset((uint8_t*)cam_big_buf + row * big_w * 4 + copy_big_w * 4, 0, (big_w - copy_big_w) * 4);
             }
         }
-        // lv_obj_invalidate(ui_Image_camera_preview);
+        lv_obj_invalidate(ui_Image_camera_preview);
     }
 
     uint32_t end_time = lv_tick_get();

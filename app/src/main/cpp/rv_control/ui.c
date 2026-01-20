@@ -55,6 +55,15 @@ void ui_init(void)
     lv_theme_t * theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
                                                false, LV_FONT_DEFAULT);
     lv_disp_set_theme(dispp, theme);
+
+    // static bool ui_init_done = false;
+    // if (ui_init_done)
+    // {
+    //     ui_draw_cur_screen();
+    //     return;
+    // }
+    // ui_init_done = true;
+
     ui_Screen1_screen_init();
     ui_Screen2_screen_init();
     ui_Screen3_screen_init();
@@ -64,7 +73,7 @@ void ui_init(void)
     ui_Screen7_screen_init();
     ui_Screen8_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
-    lv_disp_load_scr(ui_Screen1);
+    ui_draw_cur_screen();
 
     // ---- Serial example: open /dev/ttyS1 and start reader ----
     

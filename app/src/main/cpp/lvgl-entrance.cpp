@@ -173,7 +173,7 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeChanged(JNIEnv *env, jclass
     //设置格式
     ANativeWindow_setBuffersGeometry(window, WIDTH, HEIGHT, WINDOW_FORMAT_RGBA_8888);
 
-    clearScreen();
+    // clearScreen();
 
     ui_init();
 
@@ -188,6 +188,13 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeDestroy(JNIEnv *env, jclass
                                                              jobject surface) {
     run = false;
     __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s", __func__);
+    lv_indev_delete(lv_indev_get_next(NULL));
+
+    // 删除buf
+    if (buf) {
+        delete[] buf;
+        buf = nullptr;
+    }
 }
 
 extern "C"

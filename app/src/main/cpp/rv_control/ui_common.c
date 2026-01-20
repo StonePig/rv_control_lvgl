@@ -7,6 +7,8 @@ static lv_obj_t *ui_nav_icons[NAV_ICON_NUM] = {NULL};
 static lv_obj_t *highlight[NAV_ICON_NUM] = {NULL};
 static lv_obj_t *container = NULL;
 
+static uint16_t cur_screen_id = 0;
+
 lv_obj_t *ui_Screen[] = {&ui_Screen1, &ui_Screen2, &ui_Screen3, &ui_Screen4, &ui_Screen5, &ui_Screen6, &ui_Screen7, &ui_Screen8};
 
 ui_screen_func_t ui_Screen_init_cb[] = {&ui_Screen1_screen_init, &ui_Screen2_screen_init, &ui_Screen3_screen_init, &ui_Screen4_screen_init, &ui_Screen5_screen_init, &ui_Screen6_screen_init, &ui_Screen7_screen_init, &ui_Screen8_screen_init};
@@ -40,12 +42,12 @@ void bar_navi_event(lv_event_t *e)
         return;
     
     lv_obj_t *target = lv_event_get_target(e);
-    int index = (int)lv_obj_get_user_data(target);
+    cur_screen_id = (uint16_t)lv_obj_get_user_data(target);
     
-    if (index >= 0 && index < NAV_ICON_NUM)
+    if (cur_screen_id >= 0 && cur_screen_id < NAV_ICON_NUM)
     {
-        _ui_screen_change(ui_Screen[index], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[index]);
-        ui_Screen_relocalize_cb[index]();
+        _ui_screen_change(ui_Screen[cur_screen_id], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[cur_screen_id]);
+        ui_Screen_relocalize_cb[cur_screen_id]();
     }
 }
 
@@ -63,6 +65,14 @@ static bool is_navi_index_selected(uint8_t index, lv_obj_t *parent)
         return false;
 }
 
+void ui_draw_cur_screen(void)
+{
+    if (cur_screen_id >= NAV_ICON_NUM)
+        return;
+
+    _ui_screen_change(ui_Screen[cur_screen_id], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[cur_screen_id]);
+    ui_Screen_relocalize_cb[cur_screen_id]();
+}
 
 void ui_draw_navigation_bar(lv_obj_t *parent)
 {
