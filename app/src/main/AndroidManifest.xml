@@ -14,13 +14,12 @@
         <activity android:name=".MainActivity"
         android:exported="true"> <!-- 必须设置为 true，否则系统无法启动它 -->
             <intent-filter>
-                <!-- 核心：声明此Activity可作为入口点 -->
                 <action android:name="android.intent.action.MAIN" />
-                <!-- 核心：声明此Activity属于桌面类别，是成为Launcher的关键 -->
+                <action android:name="android.intent.action.SHOW_WORK_APPS" />
                 <category android:name="android.intent.category.HOME" />
-                <!-- 通常与MAIN一起使用，声明为默认类别 -->
                 <category android:name="android.intent.category.DEFAULT" />
-                <!-- 可选：如果你希望它同时出现在应用列表中 -->
+                <category android:name="android.intent.category.MONKEY"/>
+                <category android:name="android.intent.category.LAUNCHER_APP" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

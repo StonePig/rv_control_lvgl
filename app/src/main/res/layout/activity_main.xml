@@ -1,8 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.hybird.lvgl.android.lvgl.LVGLSurfaceView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-</com.hybird.lvgl.android.lvgl.LVGLSurfaceView>
+    <com.hybird.lvgl.android.lvgl.LVGLSurfaceView
+        android:id="@+id/lvgl_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Hidden SurfaceViews used as camera preview targets (offscreen/small) -->
+    <SurfaceView
+        android:id="@+id/surface_cam0"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <SurfaceView
+        android:id="@+id/surface_cam1"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <SurfaceView
+        android:id="@+id/surface_cam2"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <!-- Main camera preview SurfaceView -->
+    <SurfaceView
+        android:id="@+id/surface_cam_main"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <!-- Camera info TextViews -->
+    <TextView
+        android:id="@+id/text_cam0_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="camera1"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/text_cam1_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="camera2"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/text_cam2_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="camera3"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/text_cam_main_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="Main Camera"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:visibility="gone" />
+
+</FrameLayout>
