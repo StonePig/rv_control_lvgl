@@ -142,7 +142,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_align(calendar, LV_ALIGN_CENTER);
     // 设置日历样式 
     lv_obj_set_style_text_color(calendar, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(calendar, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(calendar, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(calendar, COLOR_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(calendar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    

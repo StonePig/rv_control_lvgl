@@ -96,14 +96,14 @@ static void screen_load_unload_event_handler(lv_event_t *e)
         // 1. First set SurfaceView params in parallel (UI operations)
         camera_bridge_set_surface_view_params(0, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
         camera_bridge_set_surface_view_params(1, CAMERA_PREVIEW_2_X, CAMERA_PREVIEW_2_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
-        camera_bridge_set_surface_view_params(2, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
+        // camera_bridge_set_surface_view_params(2, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
         camera_bridge_set_main_surface_view_params(CAMERA_PREVIEW_X, CAMERA_PREVIEW_Y, CAMERA_PREVIEW_IMAGE_WIDTH, CAMERA_PREVIEW_IMAGE_HEIGHT);
         
         // 2. Then start all cameras in parallel
         camera_bridge_set_current_main_camera_index(app_ctx.camera_id);
         camera_bridge_request_start(0);
         camera_bridge_request_start(1);
-        camera_bridge_request_start(2);
+        // camera_bridge_request_start(2);
     }
     else if (event_code == LV_EVENT_SCREEN_UNLOADED)
     {
@@ -111,7 +111,7 @@ static void screen_load_unload_event_handler(lv_event_t *e)
         // Stop all cameras in parallel
         camera_bridge_request_stop(0);
         camera_bridge_request_stop(1);
-        camera_bridge_request_stop(2);
+        // camera_bridge_request_stop(2);
         
         // Reset SurfaceViews after stopping cameras
         camera_bridge_reset_surface_views();
@@ -128,15 +128,15 @@ void ui_Screen8_screen_init(void)
 
     ui_Image_camera_preview_container_1 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
     ui_Image_camera_preview_container_2 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_2_X, CAMERA_PREVIEW_2_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
-    ui_Image_camera_preview_container_3 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
+    // ui_Image_camera_preview_container_3 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
     ui_Image_camera_preview_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_X, CAMERA_PREVIEW_Y, CAMERA_PREVIEW_IMAGE_WIDTH, CAMERA_PREVIEW_IMAGE_HEIGHT);
 
     lv_obj_set_user_data(ui_Image_camera_preview_container_1, (void *)0); // 0 for inside
     lv_obj_add_event_cb(ui_Image_camera_preview_container_1, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
     lv_obj_set_user_data(ui_Image_camera_preview_container_2, (void *)1); // 1 for outside
     lv_obj_add_event_cb(ui_Image_camera_preview_container_2, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_set_user_data(ui_Image_camera_preview_container_3, (void *)2); // 2 for outside
-    lv_obj_add_event_cb(ui_Image_camera_preview_container_3, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
+    // lv_obj_set_user_data(ui_Image_camera_preview_container_3, (void *)2); // 2 for outside
+    // lv_obj_add_event_cb(ui_Image_camera_preview_container_3, camera_preview_event_handler, LV_EVENT_CLICKED, NULL);
 
     // ui_Image_camera_preview_1 = lv_canvas_create(ui_Image_camera_preview_container_1);
     // lv_obj_set_pos(ui_Image_camera_preview_1, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y);

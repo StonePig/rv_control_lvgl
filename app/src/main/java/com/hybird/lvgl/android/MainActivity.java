@@ -205,17 +205,51 @@ public class MainActivity extends AppCompatActivity {
         MainActivity a = getInstance();
         if (a != null) {
             // Ensure camera startup is performed on the camera thread
+            synchronized (a) {
+                // Ensure camera thread is properly initialized
+                if (a.cameraThread == null) {
+                    Log.d(TAG, "startCamera3: Initializing camera thread for index=" + index);
+                    a.cameraThread = new HandlerThread("CameraThread");
+                    a.cameraThread.start();
+                    a.cameraHandler = new Handler(a.cameraThread.getLooper());
+                }
+            }
+            
+            // Now ensure camera startup is performed on the camera thread
             if (a.cameraHandler != null) {
                 final MainActivity finalA = a;
                 final int finalIndex = index;
                 a.cameraHandler.post(new Runnable() {
                     @Override
                     public void run() {
+                        // 打印启动相机的索引
+                        Log.d(TAG, "startCamera1: index=" + finalIndex);
                         finalA._startCameraInternal(finalIndex);
                     }
                 });
             } else {
-                // If cameraHandler is not yet initialized, start it on the current thread
+                // Fallback: if cameraHandler is still null, try to start directly on current thread
+                Log.e(TAG, "startCamera2: index=" + index + ", cameraHandler is null");
+                // Ensure camera thread is started
+                if (a.cameraThread == null) {
+                    a.cameraThread = new HandlerThread("CameraThread");
+                    a.cameraThread.start();
+                    a.cameraHandler = new Handler(a.cameraThread.getLooper());
+                    // Try again with the newly created handler
+                    if (a.cameraHandler != null) {
+                        final MainActivity finalA = a;
+                        final int finalIndex = index;
+                        a.cameraHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                Log.d(TAG, "startCamera4: index=" + finalIndex + ", using newly created handler");
+                                finalA._startCameraInternal(finalIndex);
+                            }
+                        });
+                        return;
+                    }
+                }
+                // Last resort: start directly on current thread
                 a._startCameraInternal(index);
             }
         }
