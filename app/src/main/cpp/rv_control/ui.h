@@ -66,6 +66,9 @@ LV_IMG_DECLARE(ui_img_inside_unsel_png);
 LV_IMG_DECLARE(ui_img_inside_sel_png);
 LV_IMG_DECLARE(ui_img_outside_sel_png);
 LV_IMG_DECLARE(ui_img_outside_unsel_png);
+LV_IMG_DECLARE(ui_img_temp_icon_png);
+LV_IMG_DECLARE(ui_img_humidity_icon_png);
+
 
 
 LV_FONT_DECLARE(ui_font_Number_big);
@@ -79,6 +82,7 @@ LV_FONT_DECLARE(ui_font_Number_digital7);
 // 各种控件的颜色定义
 #define COLOR_BG_DARK lv_color_hex(0x0)
 #define COLOR_LABLE_WHITE lv_color_hex(0xFFFFFF)
+#define COLOR_LABLE_GRAY lv_color_hex(0x888888)
 #define COLOR_HIGHLIGHT lv_color_hex(0x189FBF)
 #define COLOR_NORMAL lv_color_hex(0x141432)
 
