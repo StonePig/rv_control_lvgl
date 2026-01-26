@@ -20,6 +20,9 @@ file(GLOB_RECURSE ALL_INCLUDE "*.h")
 
 include_directories(${ALL_INCLUDE})
 
+# set(jnilibs E:/git/rv_control_lvgl/app/src/main/jniLibs)
+set(jnilibs "${CMAKE_SOURCE_DIR}/jniLibs")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${jnilibs}/${ANDROID_ABI})
 
 add_library( # Sets the name of the library.
         lvgl-android
@@ -29,6 +32,10 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         ${ALL_SOURCE})
+
+# 引入 .so 文件
+add_library(libcurl SHARED IMPORTED)
+set_target_properties(libcurl PROPERTIES IMPORTED_LOCATION "${jnilibs}/${ANDROID_ABI}/libcurl.so")
 
 
 # Searches for a specified prebuilt library and stores the path as a
@@ -55,4 +62,5 @@ target_link_libraries( # Specifies the target library.
         # included in the NDK.
         ${log-lib}
         -landroid
+        libcurl
         )

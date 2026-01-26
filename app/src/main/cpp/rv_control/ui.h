@@ -88,8 +88,8 @@ LV_FONT_DECLARE(ui_font_Number_digital7);
 
 typedef struct {
     bool is_inside_mode; // true for inside, false for outside
-    uint16_t inside_temperature;
-    uint16_t outside_temperature;
+    int16_t inside_temperature;
+    int16_t outside_temperature;
     uint16_t inside_humidity;
     uint16_t outside_humidity;
     uint8_t camera_id; // 当前使用的摄像头ID
