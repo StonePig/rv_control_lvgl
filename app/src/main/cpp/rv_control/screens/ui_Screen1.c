@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <android/log.h>
 #include <pthread.h>
 #include "../../curl/curl.h"
@@ -66,6 +67,8 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, void *us
     mem->size += realsize;
     mem->data[mem->size] = 0;
 
+    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Received %zu bytes of data", realsize);
+
     return realsize;
 }
 
@@ -87,6 +90,16 @@ static char *download_weather_icon(const char *icon_id)
     if (!icon_id)
         return NULL;
 
+    // 检查data/data/com.hybird.lvgl.android/files目录是否存在
+    char dir_path[256];
+    snprintf(dir_path, sizeof(dir_path), "data/data/com.hybird.lvgl.android/files");
+    if (access(dir_path, F_OK) != 0)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Directory %s does not exist, will create it", "data/data/com.hybird.lvgl.android/files");
+        mkdir("data/data/com.hybird.lvgl.android", 0755);
+        mkdir(dir_path, 0755);
+    }
+
     // Build local file path
     static char file_path[256];
     snprintf(file_path, sizeof(file_path), "data/data/com.hybird.lvgl.android/files/weather_icon_%s.png", icon_id);
@@ -97,7 +110,7 @@ static char *download_weather_icon(const char *icon_id)
         // Also check if file is readable
         if (access(file_path, R_OK) == 0)
         {
-            __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather icon %s already exists locally, skipping download. Path: %s", icon_id, file_path);
+            // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather icon %s already exists locally, skipping download. Path: %s", icon_id, file_path);
             return file_path;
         }
         else
@@ -167,12 +180,113 @@ static char *download_weather_icon(const char *icon_id)
     return NULL;
 }
 
-// Load PNG file and create lv_img_dsc_t for display
+// Image cache structure
 #if LV_USE_PNG
-static lv_img_dsc_t *load_png_to_img_dsc(const char *file_path)
+typedef struct img_cache_entry {
+    char *file_path;
+    lv_img_dsc_t *dsc;
+    struct img_cache_entry *next;
+} img_cache_entry_t;
+
+static img_cache_entry_t *img_cache = NULL;
+static const size_t MAX_CACHE_SIZE = 10;
+static size_t cache_size = 0;
+
+// Find image in cache
+static img_cache_entry_t *find_in_cache(const char *file_path)
+{
+    img_cache_entry_t *entry = img_cache;
+    while (entry) {
+        if (strcmp(entry->file_path, file_path) == 0) {
+            return entry;
+        }
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+// Add image to cache
+static void add_to_cache(const char *file_path, lv_img_dsc_t *dsc)
+{
+    // Check if already in cache
+    if (find_in_cache(file_path)) {
+        return;
+    }
+
+    // Create new cache entry
+    img_cache_entry_t *entry = (img_cache_entry_t *)malloc(sizeof(img_cache_entry_t));
+    if (!entry) {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to allocate memory for cache entry");
+        return;
+    }
+
+    entry->file_path = strdup(file_path);
+    if (!entry->file_path) {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to duplicate file path");
+        free(entry);
+        return;
+    }
+
+    entry->dsc = dsc;
+    entry->next = img_cache;
+    img_cache = entry;
+    cache_size++;
+
+    // Remove oldest entry if cache is full
+    if (cache_size > MAX_CACHE_SIZE) {
+        img_cache_entry_t *last = img_cache;
+        img_cache_entry_t *prev = NULL;
+
+        while (last->next) {
+            prev = last;
+            last = last->next;
+        }
+
+        if (prev) {
+            prev->next = NULL;
+        } else {
+            img_cache = NULL;
+        }
+
+        free(last->file_path);
+        free(last->dsc->data);
+        free(last->dsc);
+        free(last);
+        cache_size--;
+    }
+}
+
+// Clear image cache
+static void clear_img_cache(void)
+{
+    img_cache_entry_t *entry = img_cache;
+    while (entry) {
+        img_cache_entry_t *next = entry->next;
+        free(entry->file_path);
+        free(entry->dsc->data);
+        free(entry->dsc);
+        free(entry);
+        entry = next;
+    }
+    img_cache = NULL;
+    cache_size = 0;
+}
+
+// Load PNG file and create lv_img_dsc_t for display
+static lv_img_dsc_t *load_png_to_img_dsc(lv_obj_t *img, const char *file_path)
 {
     if (!file_path)
         return NULL;
+
+    // Check if image is already in cache
+    img_cache_entry_t *cached_entry = find_in_cache(file_path);
+    if (cached_entry) {
+        // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Using cached PNG: %s", file_path);
+        if (img) {
+            lv_img_set_src(img, cached_entry->dsc);
+        }
+        return cached_entry->dsc;
+    }
 
     // Read PNG file to memory
     unsigned char *png_data = NULL;
@@ -250,6 +364,14 @@ static lv_img_dsc_t *load_png_to_img_dsc(const char *file_path)
     dsc->data_size = width * height * 4;         // ARGB8888 = 4 bytes per pixel
     dsc->data = img_data;
 
+    // Add to cache
+    add_to_cache(file_path, dsc);
+
+    // Set image source
+    if (img) {
+        lv_img_set_src(img, dsc);
+    }
+    
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Successfully loaded PNG: %s (%ux%u)", file_path, width, height);
     return dsc;
 }
@@ -641,6 +763,7 @@ static void parse_forecast_data(const char *json)
 static void parse_weather_data(const char *current_weather, const char *forecast)
 {
     // Parse current weather
+    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Current weather: %s", current_weather);
     char *city = parse_json_string(current_weather, "name");
     if (city)
     {
@@ -810,11 +933,11 @@ static void *fetch_weather_data_thread(void *arg)
     char forecast_url[256];
 
     snprintf(current_weather_url, sizeof(current_weather_url),
-             "http://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
+             "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
 
     snprintf(forecast_url, sizeof(forecast_url),
-             "http://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
+             "https://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
 
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Fetching weather data for location: %.6f, %.6f", latitude, longitude);
@@ -1036,22 +1159,6 @@ void ui_Screen1_screen_init(void)
     lv_obj_align_to(weather_icon_img, weather_state_label, LV_ALIGN_OUT_BOTTOM_MID, -20, 0);
     lv_img_set_zoom(weather_icon_img, 256);
 
-    // // 创建温度图标
-    // weather_temp_icon = lv_img_create(weather_container);
-    // lv_img_set_src(weather_temp_icon, &ui_img_temp_icon_png);
-    // lv_obj_set_width(weather_temp_icon, LV_SIZE_CONTENT);
-    // lv_obj_set_height(weather_temp_icon, LV_SIZE_CONTENT);
-    // lv_obj_align_to(weather_temp_icon, weather_temp_label, LV_ALIGN_LEFT_MID, -50, 0);
-    // lv_img_set_zoom(weather_temp_icon, 80);
-
-    // // 创建湿度图标
-    // weather_humidity_icon = lv_img_create(weather_container);
-    // lv_img_set_src(weather_humidity_icon, &ui_img_humidity_icon_png);
-    // lv_obj_set_width(weather_humidity_icon, LV_SIZE_CONTENT);
-    // lv_obj_set_height(weather_humidity_icon, LV_SIZE_CONTENT);
-    // lv_obj_align_to(weather_humidity_icon, weather_humidity_label, LV_ALIGN_LEFT_MID, -50, 0);
-    // lv_img_set_zoom(weather_humidity_icon, 80);
-
     // 创建5天预报容器
     weather_forecast_container = lv_obj_create(weather_container);
     lv_obj_set_width(weather_forecast_container, WEATHER_CONTAINER_WIDTH - 40);
@@ -1076,16 +1183,6 @@ void ui_Screen1_screen_init(void)
             lv_obj_set_style_border_width(forecast_background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_radius(forecast_background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
         }
-        // 创建预报图标（使用简化设计，没有图标资源）
-        // forecast_icons[i] = lv_obj_create(weather_forecast_container);
-        // lv_obj_set_width(forecast_icons[i], 40);
-        // lv_obj_set_height(forecast_icons[i], 40);
-        // lv_obj_set_x(forecast_icons[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-        // lv_obj_set_y(forecast_icons[i], 20);
-        // lv_obj_set_style_bg_color(forecast_icons[i], COLOR_LABLE_GRAY, LV_PART_MAIN | LV_STATE_DEFAULT);
-        // lv_obj_set_style_border_width(forecast_icons[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        // lv_obj_set_style_radius(forecast_icons[i], 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-
         // 创建预报日期
         forecast_day_labels[i] = lv_label_create(weather_forecast_container);
         lv_obj_set_style_text_color(forecast_day_labels[i], COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -1226,29 +1323,14 @@ void ui_Screen1_screen_relocalize(void)
             char *icon_path = download_weather_icon(weather_data.weather_icon);
             if (icon_path)
             {
-                __android_log_print(ANDROID_LOG_DEBUG, TAG, "Setting weather icon path: %s", icon_path);
+                // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Setting weather icon path: %s", icon_path);
 #if LV_USE_PNG
                 // Load PNG file and create img_dsc
-                lv_img_dsc_t *img_dsc = load_png_to_img_dsc(icon_path);
-                if (img_dsc)
-                {
-                    lv_img_set_src(weather_icon_img, img_dsc);
-                    // Note: img_dsc will be freed by LVGL when the image is no longer used
-                }
-                else
-                {
-                    __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load PNG image: %s", icon_path);
-                }
+                load_png_to_img_dsc(weather_icon_img,icon_path);
 #else
                 // Fallback: try direct file path (may not work if file system not configured)
-                lv_img_set_src(weather_icon_img, icon_path);
+                lv_img_set_src(weather_icon_img, icon_path);               
 #endif
-                // Force refresh
-                // lv_obj_invalidate(weather_icon_img);
-            }
-            else
-            {
-                __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to download weather icon: %s", weather_data.weather_icon);
             }
         }
 
@@ -1281,16 +1363,7 @@ void ui_Screen1_screen_relocalize(void)
                     {
 #if LV_USE_PNG
                         // Load PNG file and create img_dsc
-                        lv_img_dsc_t *img_dsc = load_png_to_img_dsc(icon_path);
-                        if (img_dsc)
-                        {
-                            lv_img_set_src(icon_path, img_dsc);
-                            // Note: img_dsc will be freed by LVGL when the image is no longer used
-                        }
-                        else
-                        {
-                            __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load forecast PNG image: %s", icon_path);
-                        }
+                        load_png_to_img_dsc(forecast_weather_icon_labels[i],icon_path);
 #else
                         // Fallback: try direct file path (may not work if file system not configured)
                         lv_img_set_src(forecast_weather_icon_labels[i], icon_path);
