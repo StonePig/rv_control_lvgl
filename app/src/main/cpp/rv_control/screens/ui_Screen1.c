@@ -10,9 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <android/log.h>
 #include <pthread.h>
 #include "../../curl/curl.h"
+#if LV_USE_PNG
+#include "../../lvgl/extra/libs/png/lodepng.h"
+#endif
 
 // Weather API configuration
 #define OPENWEATHER_API_KEY "914ddc9e937042e557fe955f862c8ddd"
@@ -20,28 +24,244 @@
 #define FORECAST_DAYS 6
 
 // Weather data structure
-typedef struct {
+typedef struct
+{
     char city[64];
     char temp[16];
     char humidity[16];
     char weather_state[64];
+    char weather_icon[32];
     char forecast_days[FORECAST_DAYS][16];
     char forecast_high_temps[FORECAST_DAYS][16];
     char forecast_low_temps[FORECAST_DAYS][16];
     char forecast_weather_states[FORECAST_DAYS][64];
+    char forecast_weather_icons[FORECAST_DAYS][32];
 } weather_data_t;
+
+typedef struct
+{
+    char *data;
+    size_t size;
+} memory_struct_t;
 
 // Global weather data
 static weather_data_t weather_data = {0};
 
+static char *http_get(const char *url);
+
+static size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = size * nmemb;
+    memory_struct_t *mem = (memory_struct_t *)userp;
+
+    char *ptr = (char *)realloc(mem->data, mem->size + realsize + 1);
+    if (!ptr)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Not enough memory (realloc returned NULL)");
+        return 0;
+    }
+
+    mem->data = ptr;
+    memcpy(&(mem->data[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->data[mem->size] = 0;
+
+    return realsize;
+}
+
+// Get OpenWeather icon URL
+static char *get_weather_icon_url(const char *icon_id)
+{
+    if (!icon_id)
+        return NULL;
+
+    static char url[128];
+    // Use HTTP instead of HTTPS to avoid SSL issues
+    snprintf(url, sizeof(url), "https://openweathermap.org/img/wn/%s@2x.png", icon_id);
+    return url;
+}
+
+// Download weather icon from URL to local file
+static char *download_weather_icon(const char *icon_id)
+{
+    if (!icon_id)
+        return NULL;
+
+    // Build local file path
+    static char file_path[256];
+    snprintf(file_path, sizeof(file_path), "data/data/com.hybird.lvgl.android/files/weather_icon_%s.png", icon_id);
+
+    // Check if file already exists locally
+    if (access(file_path, F_OK) == 0)
+    {
+        // Also check if file is readable
+        if (access(file_path, R_OK) == 0)
+        {
+            __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather icon %s already exists locally, skipping download. Path: %s", icon_id, file_path);
+            return file_path;
+        }
+        else
+        {
+            __android_log_print(ANDROID_LOG_WARN, TAG, "Weather icon file exists but is not readable: %s", file_path);
+        }
+    }
+    else
+    {
+        __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather icon file does not exist, will download: %s", file_path);
+    }
+
+    // Get icon URL
+    char *url = get_weather_icon_url(icon_id);
+    if (!url)
+        return NULL;
+
+    // Download icon data using curl directly
+    CURL *curl;
+    CURLcode res;
+    memory_struct_t chunk;
+
+    chunk.data = (char *)malloc(1);
+    chunk.size = 0;
+
+    curl = curl_easy_init();
+    if (!curl)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to initialize curl");
+        free(chunk.data);
+        return NULL;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+    // Add SSL support
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
+    res = curl_easy_perform(curl);
+
+    if (res != CURLE_OK)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        free(chunk.data);
+        curl_easy_cleanup(curl);
+        return NULL;
+    }
+
+    curl_easy_cleanup(curl);
+
+    // Save to local file
+    FILE *fp = fopen(file_path, "wb");
+    if (fp)
+    {
+        fwrite(chunk.data, 1, chunk.size, fp);
+        fclose(fp);
+        free(chunk.data);
+        __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather icon %s downloaded and saved to %s", icon_id, file_path);
+        return file_path;
+    }
+
+    free(chunk.data);
+    return NULL;
+}
+
+// Load PNG file and create lv_img_dsc_t for display
+#if LV_USE_PNG
+static lv_img_dsc_t *load_png_to_img_dsc(const char *file_path)
+{
+    if (!file_path)
+        return NULL;
+
+    // Read PNG file to memory
+    unsigned char *png_data = NULL;
+    size_t png_data_size = 0;
+
+    FILE *fp = fopen(file_path, "rb");
+    if (!fp)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to open PNG file: %s", file_path);
+        return NULL;
+    }
+
+    // Get file size
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    if (file_size <= 0)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Invalid file size: %ld", file_size);
+        fclose(fp);
+        return NULL;
+    }
+
+    // Allocate memory for PNG data
+    png_data = (unsigned char *)malloc(file_size);
+    if (!png_data)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to allocate memory for PNG data");
+        fclose(fp);
+        return NULL;
+    }
+
+    // Read file content
+    size_t read_size = fread(png_data, 1, file_size, fp);
+    fclose(fp);
+
+    if (read_size != (size_t)file_size)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to read PNG file completely");
+        free(png_data);
+        return NULL;
+    }
+
+    png_data_size = read_size;
+
+    // Decode PNG
+    unsigned char *img_data = NULL;
+    unsigned width = 0, height = 0;
+    unsigned error = lodepng_decode32(&img_data, &width, &height, png_data, png_data_size);
+    free(png_data); // Free PNG compressed data
+
+    if (error)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to decode PNG: %u", error);
+        if (img_data)
+            free(img_data);
+        return NULL;
+    }
+
+    // Create lv_img_dsc_t
+    lv_img_dsc_t *dsc = (lv_img_dsc_t *)lv_mem_alloc(sizeof(lv_img_dsc_t));
+    if (!dsc)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to allocate memory for lv_img_dsc_t");
+        free(img_data);
+        return NULL;
+    }
+
+    // Fill in the descriptor
+    dsc->header.always_zero = 0;
+    dsc->header.w = width;
+    dsc->header.h = height;
+    dsc->header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA; // lodepng_decode32 decodes to ARGB8888
+    dsc->data_size = width * height * 4;         // ARGB8888 = 4 bytes per pixel
+    dsc->data = img_data;
+
+    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Successfully loaded PNG: %s (%ux%u)", file_path, width, height);
+    return dsc;
+}
+#endif
+
 // Forward declarations
-static char* http_get(const char* url);
-static void parse_weather_data(const char* current_weather, const char* forecast);
-static char* parse_json_string(const char* json, const char* key);
-static double parse_json_double(const char* json, const char* key);
-static int parse_json_int(const char* json, const char* key);
-static void parse_forecast_data(const char* json);
-static void* fetch_weather_data_thread(void* arg);
+static void parse_weather_data(const char *current_weather, const char *forecast);
+static char *parse_json_string(const char *json, const char *key);
+static double parse_json_double(const char *json, const char *key);
+static int parse_json_int(const char *json, const char *key);
+static void parse_forecast_data(const char *json);
+static void *fetch_weather_data_thread(void *arg);
 static void fetch_weather_data(void);
 
 lv_obj_t *ui_Screen1 = NULL;
@@ -97,12 +317,14 @@ static lv_obj_t *weather_humidity_label = NULL;
 static lv_obj_t *weather_state_label = NULL;
 static lv_obj_t *weather_temp_icon = NULL;
 static lv_obj_t *weather_humidity_icon = NULL;
+static lv_obj_t *weather_icon_img = NULL;
 static lv_obj_t *weather_forecast_container = NULL;
 static lv_obj_t *forecast_day_labels[FORECAST_DAYS] = {NULL};
 static lv_obj_t *forecast_high_temp_labels[FORECAST_DAYS] = {NULL};
 static lv_obj_t *forecast_low_temp_labels[FORECAST_DAYS] = {NULL};
 static lv_obj_t *forecast_weather_state_labels[FORECAST_DAYS] = {NULL};
 static lv_obj_t *forecast_icons[FORECAST_DAYS] = {NULL};
+static lv_obj_t *forecast_weather_icon_labels[FORECAST_DAYS] = {NULL};
 
 static void ui_inside_outside_update_display(void)
 {
@@ -122,417 +344,514 @@ static void ui_inside_outside_update_display(void)
     }
 }
 
-typedef struct {
-    char* data;
-    size_t size;
-} memory_struct_t;
-
-static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t realsize = size * nmemb;
-    memory_struct_t* mem = (memory_struct_t*)userp;
-    
-    char* ptr = (char*)realloc(mem->data, mem->size + realsize + 1);
-    if (!ptr) {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Not enough memory (realloc returned NULL)");
-        return 0;
-    }
-    
-    mem->data = ptr;
-    memcpy(&(mem->data[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->data[mem->size] = 0;
-    
-    return realsize;
-}
-
-static char* http_get(const char* url) {
-    CURL* curl;
+static char *http_get(const char *url)
+{
+    CURL *curl;
     CURLcode res;
     memory_struct_t chunk;
 
     __android_log_print(ANDROID_LOG_INFO, TAG, "Requesting URL: %s", url);
-    
-    chunk.data = (char*)malloc(1);
+
+    chunk.data = (char *)malloc(1);
     chunk.size = 0;
-    
+
     curl = curl_easy_init();
-    if (!curl) {
+    if (!curl)
+    {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to initialize curl");
         free(chunk.data);
         return NULL;
     }
-    
+
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-    
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+    // Add SSL support
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
     res = curl_easy_perform(curl);
-    
-    if (res != CURLE_OK) {
+
+    if (res != CURLE_OK)
+    {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
         free(chunk.data);
         curl_easy_cleanup(curl);
         return NULL;
     }
-    
+
     curl_easy_cleanup(curl);
-    
+
     return chunk.data;
 }
 
 // Simple JSON parser functions
-static char* parse_json_string(const char* json, const char* key) {
+static char *parse_json_string(const char *json, const char *key)
+{
     char search_key[64];
     snprintf(search_key, sizeof(search_key), "\"%s\":\"", key);
-    
-    char* start = strstr(json, search_key);
-    if (!start) {
+
+    char *start = strstr(json, search_key);
+    if (!start)
+    {
         // Try with nested main object
         char nested_key[64];
         snprintf(nested_key, sizeof(nested_key), "\"main\":{[^}]*\"%s\":\"", key);
         start = strstr(json, nested_key);
-        if (!start) return NULL;
+        if (!start)
+            return NULL;
         start = strstr(start, ":\"");
-        if (!start) return NULL;
+        if (!start)
+            return NULL;
         start += 3;
-    } else {
+    }
+    else
+    {
         start += strlen(search_key);
     }
-    
-    char* end = strchr(start, '\"');
-    if (!end) return NULL;
-    
+
+    char *end = strchr(start, '\"');
+    if (!end)
+        return NULL;
+
     int len = end - start;
-    char* result = (char*)malloc(len + 1);
-    if (result) {
+    char *result = (char *)malloc(len + 1);
+    if (result)
+    {
         strncpy(result, start, len);
         result[len] = '\0';
     }
-    
+
     return result;
 }
 
-static double parse_json_double(const char* json, const char* key) {
+static double parse_json_double(const char *json, const char *key)
+{
     char search_key[64];
     snprintf(search_key, sizeof(search_key), "\"%s\":", key);
-    
-    char* start = strstr(json, search_key);
-    if (!start) {
+
+    char *start = strstr(json, search_key);
+    if (!start)
+    {
         // Try with nested main object
         char nested_key[64];
         snprintf(nested_key, sizeof(nested_key), "\"main\":{[^}]*\"%s\":", key);
         start = strstr(json, nested_key);
-        if (!start) return 0.0;
+        if (!start)
+            return 0.0;
         start = strstr(start, ":");
-        if (!start) return 0.0;
+        if (!start)
+            return 0.0;
         start += 1;
-    } else {
+    }
+    else
+    {
         start += strlen(search_key);
     }
-    
+
     // Skip whitespace
-    while (*start == ' ' || *start == '\t' || *start == '\n' || *start == '\r') {
+    while (*start == ' ' || *start == '\t' || *start == '\n' || *start == '\r')
+    {
         start++;
     }
-    
+
     return strtod(start, NULL);
 }
 
-static int parse_json_int(const char* json, const char* key) {
+static int parse_json_int(const char *json, const char *key)
+{
     return (int)parse_json_double(json, key);
 }
 
-static void parse_forecast_data(const char* json) {
-    char* list_start = strstr(json, "\"list\":[");
-    if (!list_start) return;
+static void parse_forecast_data(const char *json)
+{
+    char *list_start = strstr(json, "\"list\":[");
+    if (!list_start)
+        return;
     list_start += 7;
-    
-    char* item_start = list_start;
+
+    char *item_start = list_start;
     char current_date[11] = "";
     int day_count = 0;
-    
-    while (day_count < FORECAST_DAYS) {
+
+    while (day_count < FORECAST_DAYS)
+    {
         // Find dt_txt
-        char* dt_txt_start = strstr(item_start, "\"dt_txt\":\"");
-        if (!dt_txt_start) break;
+        char *dt_txt_start = strstr(item_start, "\"dt_txt\":\"");
+        if (!dt_txt_start)
+            break;
         dt_txt_start += 10;
-        
-        char* dt_txt_end = strchr(dt_txt_start, '\"');
-        if (!dt_txt_end) break;
-        
+
+        char *dt_txt_end = strchr(dt_txt_start, '\"');
+        if (!dt_txt_end)
+            break;
+
         // Extract full date (YYYY-MM-DD)
         int len = dt_txt_end - dt_txt_start;
         char date_str[11] = "";
-        if (len >= 10) {
+        if (len >= 10)
+        {
             strncpy(date_str, dt_txt_start, 10);
             date_str[10] = '\0';
         }
-        
+
         // Check if this is a new day
-        if (strcmp(date_str, current_date) != 0) {
+        if (strcmp(date_str, current_date) != 0)
+        {
             // Save the date for this day
             strcpy(current_date, date_str);
-            
+
             // Extract MM-DD format
-            if (len >= 10) {
+            if (len >= 10)
+            {
                 strncpy(weather_data.forecast_days[day_count], dt_txt_start + 5, 5); // MM-DD
                 weather_data.forecast_days[day_count][5] = '\0';
             }
-            
+
             // Find all temperature data for this day
-            double min_temp = 100.0; // Initialize with a high value
+            double min_temp = 100.0;  // Initialize with a high value
             double max_temp = -100.0; // Initialize with a low value
-            char* day_item_start = item_start;
+            char *day_item_start = item_start;
             char day_date[11] = "";
-            
+
             // Process all items for this day
-            while (1) {
+            while (1)
+            {
                 // Find dt_txt for current item
-                char* day_dt_txt_start = strstr(day_item_start, "\"dt_txt\":\"");
-                if (!day_dt_txt_start) break;
+                char *day_dt_txt_start = strstr(day_item_start, "\"dt_txt\":\"");
+                if (!day_dt_txt_start)
+                    break;
                 day_dt_txt_start += 10;
-                
-                char* day_dt_txt_end = strchr(day_dt_txt_start, '\"');
-                if (!day_dt_txt_end) break;
-                
+
+                char *day_dt_txt_end = strchr(day_dt_txt_start, '\"');
+                if (!day_dt_txt_end)
+                    break;
+
                 // Extract date for this item
                 char day_item_date[11] = "";
-                if (day_dt_txt_end - day_dt_txt_start >= 10) {
+                if (day_dt_txt_end - day_dt_txt_start >= 10)
+                {
                     strncpy(day_item_date, day_dt_txt_start, 10);
                     day_item_date[10] = '\0';
                 }
-                
+
                 // Check if this item is still for the same day
-                if (strcmp(day_item_date, current_date) != 0) {
+                if (strcmp(day_item_date, current_date) != 0)
+                {
                     break;
                 }
-                
+
                 // Find main object
-                char* main_start = strstr(day_item_start, "\"main\":{");
-                if (main_start) {
+                char *main_start = strstr(day_item_start, "\"main\":{");
+                if (main_start)
+                {
                     main_start += 7;
-                    
+
                     // Parse temperature for this item
                     double temp = parse_json_double(main_start, "temp");
-                    
+
                     // Update min and max temperatures
-                    if (temp < min_temp) {
+                    if (temp < min_temp)
+                    {
                         min_temp = temp;
                     }
-                    if (temp > max_temp) {
+                    if (temp > max_temp)
+                    {
                         max_temp = temp;
                     }
-                    
-                    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Day %s, time %s, temp: %.1f", 
-                                       current_date, day_item_date + 11, temp);
+
+                    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Day %s, time %s, temp: %.1f",
+                                        current_date, day_item_date + 11, temp);
                 }
-                
+
                 // Move to next item
-                char* next_item = strstr(day_dt_txt_end, "}," );
-                if (!next_item) break;
+                char *next_item = strstr(day_dt_txt_end, "},");
+                if (!next_item)
+                    break;
                 day_item_start = next_item + 2;
             }
-            
+
             // Parse weather state for this day (use the first item's weather state)
-            char* weather_state_start = strstr(item_start, "\"weather\":[{" );
-            if (weather_state_start) {
+            char *weather_state_start = strstr(item_start, "\"weather\":[{");
+            if (weather_state_start)
+            {
                 weather_state_start += 12;
-                char* main_start = strstr(weather_state_start, "\"main\":\"");
-                if (main_start) {
+
+                // Parse weather state
+                char *main_start = strstr(weather_state_start, "\"main\":\"");
+                if (main_start)
+                {
                     main_start += 8;
-                    char* main_end = strchr(main_start, '\"');
-                    if (main_end) {
+                    char *main_end = strchr(main_start, '\"');
+                    if (main_end)
+                    {
                         int state_len = main_end - main_start;
-                        if (state_len < sizeof(weather_data.forecast_weather_states[day_count])) {
+                        if (state_len < sizeof(weather_data.forecast_weather_states[day_count]))
+                        {
                             strncpy(weather_data.forecast_weather_states[day_count], main_start, state_len);
                             weather_data.forecast_weather_states[day_count][state_len] = '\0';
                         }
                     }
                 }
+
+                // Parse weather icon
+                char *icon_start = strstr(weather_state_start, "\"icon\":\"");
+                if (icon_start)
+                {
+                    icon_start += 8;
+                    char *icon_end = strchr(icon_start, '\"');
+                    if (icon_end)
+                    {
+                        int icon_len = icon_end - icon_start;
+                        if (icon_len < sizeof(weather_data.forecast_weather_icons[day_count]))
+                        {
+                            strncpy(weather_data.forecast_weather_icons[day_count], icon_start, icon_len);
+                            weather_data.forecast_weather_icons[day_count][icon_len] = '\0';
+                            __android_log_print(ANDROID_LOG_DEBUG, TAG, "Forecast day %d icon: %s", day_count, weather_data.forecast_weather_icons[day_count]);
+                        }
+                    }
+                }
             }
-            
+
             // Use the calculated min and max temperatures
             snprintf(weather_data.forecast_high_temps[day_count], sizeof(weather_data.forecast_high_temps[day_count]), "%d°", (int)max_temp);
             snprintf(weather_data.forecast_low_temps[day_count], sizeof(weather_data.forecast_low_temps[day_count]), "%d°", (int)min_temp);
-            
-            // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Forecast day %d: %s, high: %s, low: %s, state: %s", 
-            //                    day_count, weather_data.forecast_days[day_count], 
-            //                    weather_data.forecast_high_temps[day_count], 
+
+            // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Forecast day %d: %s, high: %s, low: %s, state: %s",
+            //                    day_count, weather_data.forecast_days[day_count],
+            //                    weather_data.forecast_high_temps[day_count],
             //                    weather_data.forecast_low_temps[day_count],
             //                    weather_data.forecast_weather_states[day_count]);
-            
+
             day_count++;
         }
-        
+
         // Move to next item
-        item_start = strstr(dt_txt_end, "}," );
-        if (!item_start) break;
+        item_start = strstr(dt_txt_end, "},");
+        if (!item_start)
+            break;
         item_start += 2;
     }
-    
+
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Parsed %d days of forecast data", day_count);
 }
 
-static void parse_weather_data(const char* current_weather, const char* forecast) {
+static void parse_weather_data(const char *current_weather, const char *forecast)
+{
     // Parse current weather
-    char* city = parse_json_string(current_weather, "name");
-    if (city) {
+    char *city = parse_json_string(current_weather, "name");
+    if (city)
+    {
         strncpy(weather_data.city, city, sizeof(weather_data.city) - 1);
         free(city);
     }
-    
+
     double temp = parse_json_double(current_weather, "temp");
     int humidity = parse_json_int(current_weather, "humidity");
-    
+
     snprintf(weather_data.temp, sizeof(weather_data.temp), "%d°C", (int)temp);
     snprintf(weather_data.humidity, sizeof(weather_data.humidity), "%d%%", humidity);
-    
+
     // Parse weather state
-    char* weather_state_start = strstr(current_weather, "\"weather\":[{" );
-    if (weather_state_start) {
+    char *weather_state_start = strstr(current_weather, "\"weather\":[{");
+    if (weather_state_start)
+    {
         weather_state_start += 12;
-        char* main_start = strstr(weather_state_start, "\"main\":\"");
-        if (main_start) {
+
+        // Parse weather state
+        char *main_start = strstr(weather_state_start, "\"main\":\"");
+        if (main_start)
+        {
             main_start += 8;
-            char* main_end = strchr(main_start, '\"');
-            if (main_end) {
+            char *main_end = strchr(main_start, '\"');
+            if (main_end)
+            {
                 int state_len = main_end - main_start;
-                if (state_len < sizeof(weather_data.weather_state)) {
+                if (state_len < sizeof(weather_data.weather_state))
+                {
                     strncpy(weather_data.weather_state, main_start, state_len);
                     weather_data.weather_state[state_len] = '\0';
                 }
             }
         }
+
+        // Parse weather icon
+        char *icon_start = strstr(weather_state_start, "\"icon\":\"");
+        if (icon_start)
+        {
+            icon_start += 8;
+            char *icon_end = strchr(icon_start, '\"');
+            if (icon_end)
+            {
+                int icon_len = icon_end - icon_start;
+                if (icon_len < sizeof(weather_data.weather_icon))
+                {
+                    strncpy(weather_data.weather_icon, icon_start, icon_len);
+                    weather_data.weather_icon[icon_len] = '\0';
+                    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather icon: %s", weather_data.weather_icon);
+                }
+            }
+        }
     }
-    
+
     // Parse forecast
     parse_forecast_data(forecast);
 }
 
-static void* fetch_weather_data_thread(void* arg) {
+static void *fetch_weather_data_thread(void *arg)
+{
     double latitude = 39.9042; // Default to Beijing
     double longitude = 116.4074;
-    
+
     // Get current location via IP geolocation
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Getting current location via IP geolocation");
-    
+
     // Use ipinfo.io API to get location by IP
-    const char* url = "http://ipinfo.io/json";
-    
-    char* response = http_get(url);
-    if (response) {
+    const char *url = "http://ipinfo.io/json";
+
+    char *response = http_get(url);
+    if (response)
+    {
         // Log the first 500 characters of the response for debugging
         __android_log_print(ANDROID_LOG_DEBUG, TAG, "IPinfo response (first 500 chars): %.*s", 500, response);
-        
+
         // Simplified parsing: just look for "loc": " pattern
-        char* loc_start = strstr(response, "loc");
-        if (loc_start) {
+        char *loc_start = strstr(response, "loc");
+        if (loc_start)
+        {
             // Find the colon
-            char* colon = strchr(loc_start, ':');
-            if (colon) {
+            char *colon = strchr(loc_start, ':');
+            if (colon)
+            {
                 // Move past colon and any whitespace
-                char* pos = colon + 1;
-                while (*pos == ' ' || *pos == '\t' || *pos == '\n' || *pos == '\r') {
+                char *pos = colon + 1;
+                while (*pos == ' ' || *pos == '\t' || *pos == '\n' || *pos == '\r')
+                {
                     pos++;
                 }
-                
+
                 // Check if there's a quote
-                if (*pos == '"') {
+                if (*pos == '"')
+                {
                     pos++;
                 }
-                
+
                 // Find the end of the location string
                 // Be more permissive - only stop at } or "
-                char* end = pos;
-                while (*end && *end != '}' && *end != '"') {
+                char *end = pos;
+                while (*end && *end != '}' && *end != '"')
+                {
                     end++;
                 }
-                
-                if (end > pos) {
+
+                if (end > pos)
+                {
                     // Extract location string
                     char loc_str[32] = "";
                     int len = end - pos;
-                    if (len < sizeof(loc_str)) {
+                    if (len < sizeof(loc_str))
+                    {
                         strncpy(loc_str, pos, len);
                         loc_str[len] = '\0';
                     }
-                    
+
                     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Extracted location string: '%s' (length: %d)", loc_str, len);
-                    
+
                     // Parse latitude and longitude
                     int parse_result = sscanf(loc_str, "%lf,%lf", &latitude, &longitude);
                     __android_log_print(ANDROID_LOG_DEBUG, TAG, "sscanf parse result: %d", parse_result);
-                    
-                    if (parse_result == 2) {
+
+                    if (parse_result == 2)
+                    {
                         __android_log_print(ANDROID_LOG_DEBUG, TAG, "Got location: %.6f, %.6f", latitude, longitude);
-                    } else {
+                    }
+                    else
+                    {
                         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to parse latitude and longitude: '%s'", loc_str);
-                        
+
                         // Try alternative parsing - maybe with spaces
                         parse_result = sscanf(loc_str, "%lf , %lf", &latitude, &longitude);
-                        if (parse_result == 2) {
+                        if (parse_result == 2)
+                        {
                             __android_log_print(ANDROID_LOG_DEBUG, TAG, "Got location with spaces: %.6f, %.6f", latitude, longitude);
-                        } else {
+                        }
+                        else
+                        {
                             __android_log_print(ANDROID_LOG_ERROR, TAG, "Alternative parsing also failed");
                         }
                     }
-                } else {
+                }
+                else
+                {
                     __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to find location data");
                 }
-            } else {
+            }
+            else
+            {
                 __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to find colon after loc");
             }
-        } else {
+        }
+        else
+        {
             __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to find loc in response");
         }
-        
+
         free(response);
-    } else {
+    }
+    else
+    {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to get location data");
     }
-    
+
     // Build URLs
     char current_weather_url[256];
     char forecast_url[256];
-    
-    snprintf(current_weather_url, sizeof(current_weather_url), 
-             "http://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn", 
+
+    snprintf(current_weather_url, sizeof(current_weather_url),
+             "http://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
-    
-    snprintf(forecast_url, sizeof(forecast_url), 
-             "http://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn", 
+
+    snprintf(forecast_url, sizeof(forecast_url),
+             "http://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
-    
+
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Fetching weather data for location: %.6f, %.6f", latitude, longitude);
-    
+
     // Fetch data
-    char* current_weather = http_get(current_weather_url);
-    char* forecast = http_get(forecast_url);
-    
-    if (current_weather && forecast) {
+    char *current_weather = http_get(current_weather_url);
+    char *forecast = http_get(forecast_url);
+
+    if (current_weather && forecast)
+    {
         parse_weather_data(current_weather, forecast);
         __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather data fetched: %s %s", weather_data.city, weather_data.temp);
     }
-    
+
     // Cleanup
-    if (current_weather) free(current_weather);
-    if (forecast) free(forecast);
-    
+    if (current_weather)
+        free(current_weather);
+    if (forecast)
+        free(forecast);
+
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather data fetch complete");
-    
+
     return NULL;
 }
 
-static void fetch_weather_data(void) {
+static void fetch_weather_data(void)
+{
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Starting weather data fetch thread");
-    
+
     pthread_t thread;
     int result = pthread_create(&thread, NULL, fetch_weather_data_thread, NULL);
-    if (result != 0) {
+    if (result != 0)
+    {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to create weather fetch thread: %s", strerror(result));
-    } else {
+    }
+    else
+    {
         // Detach the thread so it cleans up automatically
         pthread_detach(thread);
     }
@@ -581,7 +900,7 @@ void ui_Screen1_screen_init(void)
     // lv_obj_clear_flag(ui_Imagehomepage, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
     // 创建时间显示容器
-    lv_obj_t * time_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, TIME_CONTAINER_X, TIME_CONTAINER_Y, TIME_CONTAINER_WIDTH, TIME_CONTAINER_HEIGHT);
+    lv_obj_t *time_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, TIME_CONTAINER_X, TIME_CONTAINER_Y, TIME_CONTAINER_WIDTH, TIME_CONTAINER_HEIGHT);
     // 创建日期标签
     date_label = lv_label_create(time_container);
     lv_obj_set_style_text_color(date_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -595,20 +914,20 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_align(time_label, LV_ALIGN_BOTTOM_MID);
     lv_obj_set_style_pad_bottom(time_label, 20, LV_PART_MAIN | LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    //创建日历容器
-    lv_obj_t * calendar_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CALENDAR_CONTAINER_X, CALENDAR_CONTAINER_Y, CALENDAR_CONTAINER_WIDTH, CALENDAR_CONTAINER_HEIGHT);
+    // 创建日历容器
+    lv_obj_t *calendar_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CALENDAR_CONTAINER_X, CALENDAR_CONTAINER_Y, CALENDAR_CONTAINER_WIDTH, CALENDAR_CONTAINER_HEIGHT);
     // 创建日历控件
     calendar = lv_calendar_create(calendar_container);
     lv_obj_set_size(calendar, CALENDAR_CONTAINER_WIDTH - 20, CALENDAR_CONTAINER_HEIGHT - 20);
     lv_obj_set_align(calendar, LV_ALIGN_CENTER);
-    // 设置日历样式 
+    // 设置日历样式
     lv_obj_set_style_text_color(calendar, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(calendar, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(calendar, COLOR_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(calendar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   
+
     // 创建温湿度显示容器
-    temp_humidity_container = ui_create_display_container(cur_ui_screen, COLOR_HIGHLIGHT, TEMP_HUMIDITY_CONTAINER_X, TEMP_HUMIDITY_CONTAINER_Y, TEMP_HUMIDITY_CONTAINER_WIDTH, TEMP_HUMIDITY_CONTAINER_HEIGHT);  
+    temp_humidity_container = ui_create_display_container(cur_ui_screen, COLOR_HIGHLIGHT, TEMP_HUMIDITY_CONTAINER_X, TEMP_HUMIDITY_CONTAINER_Y, TEMP_HUMIDITY_CONTAINER_WIDTH, TEMP_HUMIDITY_CONTAINER_HEIGHT);
     // 创建温度标签
     temp_label = lv_label_create(temp_humidity_container);
     lv_obj_set_style_text_color(temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -664,7 +983,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_width(inside_image, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(inside_image, LV_SIZE_CONTENT); /// 1
     lv_obj_set_align(inside_image, LV_ALIGN_CENTER);
-    lv_img_set_zoom(inside_image, 180); 
+    lv_img_set_zoom(inside_image, 180);
     lv_obj_set_user_data(inside_container, (void *)0); // 0 for inside
     lv_obj_add_event_cb(inside_container, inside_outside_event_handler, LV_EVENT_CLICKED, NULL);
 
@@ -674,41 +993,49 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_width(outside_image, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(outside_image, LV_SIZE_CONTENT); /// 1
     lv_obj_set_align(outside_image, LV_ALIGN_CENTER);
-    lv_img_set_zoom(outside_image, 180); 
+    lv_img_set_zoom(outside_image, 180);
     lv_obj_set_user_data(outside_container, (void *)1); // 1 for outside
     lv_obj_add_event_cb(outside_container, inside_outside_event_handler, LV_EVENT_CLICKED, NULL);
 
     // 创建天气显示容器
     weather_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, WEATHER_CONTAINER_X, WEATHER_CONTAINER_Y, WEATHER_CONTAINER_WIDTH, WEATHER_CONTAINER_HEIGHT);
-    
+
     // 创建城市名称显示
     weather_city_label = lv_label_create(weather_container);
     // lv_label_set_text(weather_city_label, "New York");
     lv_obj_set_style_text_color(weather_city_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(weather_city_label, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align(weather_city_label, LV_ALIGN_TOP_LEFT, 40, 30);
-    
+
     // 创建当前温度显示
     weather_temp_label = lv_label_create(weather_container);
     // lv_label_set_text(weather_temp_label, "75°C");
     lv_obj_set_style_text_color(weather_temp_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(weather_temp_label, &ui_font_Number_digital7, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align(weather_temp_label, LV_ALIGN_TOP_MID, 0, 120);
-    
+
     // 创建当前湿度显示
     // weather_humidity_label = lv_label_create(weather_container);
     // lv_label_set_text(weather_humidity_label, "55%");
     // lv_obj_set_style_text_color(weather_humidity_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     // lv_obj_set_style_text_font(weather_humidity_label, &ui_font_Number_digital7, LV_PART_MAIN | LV_STATE_DEFAULT);
     // lv_obj_align(weather_humidity_label, LV_ALIGN_TOP_RIGHT, -120, 180);
-    
+
     // 创建当前天气状态显示
     weather_state_label = lv_label_create(weather_container);
     // lv_label_set_text(weather_state_label, "Sunny");
     lv_obj_set_style_text_color(weather_state_label, COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(weather_state_label, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align_to(weather_state_label, weather_temp_label, LV_ALIGN_OUT_BOTTOM_MID, -20, 30);
-    
+
+    // 创建天气图标显示
+    weather_icon_img = lv_img_create(weather_container);
+    // lv_img_set_src(weather_icon_img, &ui_img_temp_icon_png);
+    lv_obj_set_width(weather_icon_img, LV_SIZE_CONTENT);
+    lv_obj_set_height(weather_icon_img, LV_SIZE_CONTENT);
+    lv_obj_align_to(weather_icon_img, weather_state_label, LV_ALIGN_OUT_BOTTOM_MID, -20, 0);
+    lv_img_set_zoom(weather_icon_img, 256);
+
     // // 创建温度图标
     // weather_temp_icon = lv_img_create(weather_container);
     // lv_img_set_src(weather_temp_icon, &ui_img_temp_icon_png);
@@ -716,7 +1043,7 @@ void ui_Screen1_screen_init(void)
     // lv_obj_set_height(weather_temp_icon, LV_SIZE_CONTENT);
     // lv_obj_align_to(weather_temp_icon, weather_temp_label, LV_ALIGN_LEFT_MID, -50, 0);
     // lv_img_set_zoom(weather_temp_icon, 80);
-    
+
     // // 创建湿度图标
     // weather_humidity_icon = lv_img_create(weather_container);
     // lv_img_set_src(weather_humidity_icon, &ui_img_humidity_icon_png);
@@ -724,7 +1051,7 @@ void ui_Screen1_screen_init(void)
     // lv_obj_set_height(weather_humidity_icon, LV_SIZE_CONTENT);
     // lv_obj_align_to(weather_humidity_icon, weather_humidity_label, LV_ALIGN_LEFT_MID, -50, 0);
     // lv_img_set_zoom(weather_humidity_icon, 80);
-    
+
     // 创建5天预报容器
     weather_forecast_container = lv_obj_create(weather_container);
     lv_obj_set_width(weather_forecast_container, WEATHER_CONTAINER_WIDTH - 40);
@@ -733,9 +1060,10 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_style_pad_bottom(weather_forecast_container, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(weather_forecast_container, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(weather_forecast_container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    
+
     // 创建FORECAST_DAYS天预报项
-    for(int i = 0; i < FORECAST_DAYS; i++) {
+    for (int i = 0; i < FORECAST_DAYS; i++)
+    {
         // 背景
         if (i % 2 == 1)
         {
@@ -743,59 +1071,64 @@ void ui_Screen1_screen_init(void)
             lv_obj_set_width(forecast_background, (WEATHER_CONTAINER_WIDTH - 40) / 5);
             lv_obj_set_height(forecast_background, 220);
             lv_obj_set_x(forecast_background, -20 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-            lv_obj_set_y(forecast_background, 20);
+            lv_obj_set_y(forecast_background, 30);
             lv_obj_set_style_bg_color(forecast_background, lv_color_hex(0x304080), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_border_width(forecast_background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_radius(forecast_background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
         }
         // 创建预报图标（使用简化设计，没有图标资源）
-        forecast_icons[i] = lv_obj_create(weather_forecast_container);
-        lv_obj_set_width(forecast_icons[i], 40);
-        lv_obj_set_height(forecast_icons[i], 40);
-        lv_obj_set_x(forecast_icons[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-        lv_obj_set_y(forecast_icons[i], 20);
-        lv_obj_set_style_bg_color(forecast_icons[i], COLOR_LABLE_GRAY, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_width(forecast_icons[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_radius(forecast_icons[i], 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-        
+        // forecast_icons[i] = lv_obj_create(weather_forecast_container);
+        // lv_obj_set_width(forecast_icons[i], 40);
+        // lv_obj_set_height(forecast_icons[i], 40);
+        // lv_obj_set_x(forecast_icons[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
+        // lv_obj_set_y(forecast_icons[i], 20);
+        // lv_obj_set_style_bg_color(forecast_icons[i], COLOR_LABLE_GRAY, LV_PART_MAIN | LV_STATE_DEFAULT);
+        // lv_obj_set_style_border_width(forecast_icons[i], 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        // lv_obj_set_style_radius(forecast_icons[i], 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
         // 创建预报日期
         forecast_day_labels[i] = lv_label_create(weather_forecast_container);
-        // lv_label_set_text(forecast_day_labels[i], "Mon");
         lv_obj_set_style_text_color(forecast_day_labels[i], COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(forecast_day_labels[i], &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_x(forecast_day_labels[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-        lv_obj_set_y(forecast_day_labels[i], 80);
-        
+        lv_obj_set_y(forecast_day_labels[i], 40);
+
+        // 创建天气图标
+        forecast_weather_icon_labels[i] = lv_img_create(weather_forecast_container);
+        lv_obj_set_width(forecast_weather_icon_labels[i], LV_SIZE_CONTENT);
+        lv_obj_set_height(forecast_weather_icon_labels[i], LV_SIZE_CONTENT);
+        lv_obj_set_x(forecast_weather_icon_labels[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5 - 30);
+        lv_obj_set_y(forecast_weather_icon_labels[i], 50);
+        lv_img_set_zoom(forecast_weather_icon_labels[i], 200);
+
         // 创建最高温度
         forecast_high_temp_labels[i] = lv_label_create(weather_forecast_container);
         // lv_label_set_text(forecast_high_temp_labels[i], "75°");
         lv_obj_set_style_text_color(forecast_high_temp_labels[i], COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(forecast_high_temp_labels[i], &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_x(forecast_high_temp_labels[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-        lv_obj_set_y(forecast_high_temp_labels[i], 120);
-        
+        lv_obj_set_y(forecast_high_temp_labels[i], 140);
+
         // 创建最低温度
         forecast_low_temp_labels[i] = lv_label_create(weather_forecast_container);
         // lv_label_set_text(forecast_low_temp_labels[i], "41°");
         lv_obj_set_style_text_color(forecast_low_temp_labels[i], COLOR_LABLE_GRAY, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(forecast_low_temp_labels[i], &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_x(forecast_low_temp_labels[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-        lv_obj_set_y(forecast_low_temp_labels[i], 160);
-        
+        lv_obj_set_y(forecast_low_temp_labels[i], 180);
+
         // 创建天气状态
         forecast_weather_state_labels[i] = lv_label_create(weather_forecast_container);
         // lv_label_set_text(forecast_weather_state_labels[i], "Sunny");
         lv_obj_set_style_text_color(forecast_weather_state_labels[i], COLOR_LABLE_WHITE, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(forecast_weather_state_labels[i], &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_x(forecast_weather_state_labels[i], 2 + i * (WEATHER_CONTAINER_WIDTH - 40) / 5);
-        lv_obj_set_y(forecast_weather_state_labels[i], 200);
-
-
+        lv_obj_set_y(forecast_weather_state_labels[i], 220);
     }
 
     ui_Screen1_screen_relocalize();
 
-    //启动一个定时器每分钟更新一次时间显示
+    // 启动一个定时器每分钟更新一次时间显示
     lv_timer_create(update_time_task, 1000, NULL);
 
     ui_draw_navigation_bar(cur_ui_screen);
@@ -805,7 +1138,7 @@ void ui_Screen1_screen_destroy(void)
 {
     if (cur_ui_screen)
         lv_obj_del(cur_ui_screen);
-    
+
     cur_ui_screen = NULL;
 
     ui_navigation_bar_destroy();
@@ -827,14 +1160,14 @@ void ui_Screen1_screen_relocalize(void)
         lv_label_set_text(time_label, time_str);
 
         lv_calendar_set_today_date(calendar, local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday); // 设置今天日期，实际应用中应动态获取当前日期
-        lv_calendar_set_showed_date(calendar, local_time->tm_year + 1900, local_time->tm_mon + 1); // 设置显示的月份，实际应用中应动态获取当前月份
+        lv_calendar_set_showed_date(calendar, local_time->tm_year + 1900, local_time->tm_mon + 1);                     // 设置显示的月份，实际应用中应动态获取当前月份
         lv_calendar_date_t highlighted_dates;
         highlighted_dates.year = local_time->tm_year + 1900;
         highlighted_dates.month = local_time->tm_mon + 1;
         highlighted_dates.day = local_time->tm_mday;
         lv_calendar_set_highlighted_dates(calendar, &highlighted_dates, 1);
 
-        if(app_ctx.is_inside_mode)
+        if (app_ctx.is_inside_mode)
         {
             lv_label_set_text_fmt(temp_label, "%d°C", app_ctx.inside_temperature);
             lv_label_set_text_fmt(humidity_label, "%d%%", app_ctx.inside_humidity);
@@ -844,60 +1177,135 @@ void ui_Screen1_screen_relocalize(void)
             lv_label_set_text_fmt(temp_label, "%d°C", app_ctx.outside_temperature);
             lv_label_set_text_fmt(humidity_label, "%d%%", app_ctx.outside_humidity);
         }
-        
+
         // 定期获取天气数据（每10分钟更新一次）
         static time_t last_update = 0;
         time_t now = time(NULL);
-        if (now - last_update > 10 * 60 || last_update == 0) {
+        if (now - last_update > 10 * 60 || last_update == 0)
+        {
             fetch_weather_data();
             last_update = now;
             // curl_easy_init();
-
         }
-        
+
         // 更新天气数据（使用真实数据）
         // 更新城市名称
-        if (strlen(weather_data.city) > 0) {
+        if (strlen(weather_data.city) > 0)
+        {
             lv_label_set_text(weather_city_label, weather_data.city);
-        } else {
+        }
+        else
+        {
             lv_label_set_text(weather_city_label, "Load Location...");
         }
-        
+
         // 更新当前温度和湿度
-        if (strlen(weather_data.temp) > 0) {
+        if (strlen(weather_data.temp) > 0)
+        {
             lv_label_set_text(weather_temp_label, weather_data.temp);
-        } else {
+        }
+        else
+        {
             lv_label_set_text(weather_temp_label, "--°C");
         }
-        
+
         // 更新当前天气状态
-        if (strlen(weather_data.weather_state) > 0) {
+        if (strlen(weather_data.weather_state) > 0)
+        {
             lv_label_set_text(weather_state_label, weather_data.weather_state);
-        } else {
+        }
+        else
+        {
             lv_label_set_text(weather_state_label, "--");
         }
-        
+
+        // 更新当前天气图标
+        if (strlen(weather_data.weather_icon) > 0)
+        {
+            // Download weather icon
+            char *icon_path = download_weather_icon(weather_data.weather_icon);
+            if (icon_path)
+            {
+                __android_log_print(ANDROID_LOG_DEBUG, TAG, "Setting weather icon path: %s", icon_path);
+#if LV_USE_PNG
+                // Load PNG file and create img_dsc
+                lv_img_dsc_t *img_dsc = load_png_to_img_dsc(icon_path);
+                if (img_dsc)
+                {
+                    lv_img_set_src(weather_icon_img, img_dsc);
+                    // Note: img_dsc will be freed by LVGL when the image is no longer used
+                }
+                else
+                {
+                    __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load PNG image: %s", icon_path);
+                }
+#else
+                // Fallback: try direct file path (may not work if file system not configured)
+                lv_img_set_src(weather_icon_img, icon_path);
+#endif
+                // Force refresh
+                // lv_obj_invalidate(weather_icon_img);
+            }
+            else
+            {
+                __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to download weather icon: %s", weather_data.weather_icon);
+            }
+        }
+
         // 更新FORECAST_DAYS天预报
-        for(int i = 0; i < FORECAST_DAYS; i++) {
-            if (strlen(weather_data.forecast_days[i]) > 0) {
+        for (int i = 0; i < FORECAST_DAYS; i++)
+        {
+            if (strlen(weather_data.forecast_days[i]) > 0)
+            {
                 lv_label_set_text(forecast_day_labels[i], weather_data.forecast_days[i]);
                 lv_label_set_text(forecast_high_temp_labels[i], weather_data.forecast_high_temps[i]);
                 lv_label_set_text(forecast_low_temp_labels[i], weather_data.forecast_low_temps[i]);
-                
+
                 // 更新预报天气状态
-                if (strlen(weather_data.forecast_weather_states[i]) > 0) {
+                if (strlen(weather_data.forecast_weather_states[i]) > 0)
+                {
                     lv_label_set_text(forecast_weather_state_labels[i], weather_data.forecast_weather_states[i]);
                     // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Forecast day %d state: %s", i, weather_data.forecast_weather_states[i]);
-                } else {
+                }
+                else
+                {
                     lv_label_set_text(forecast_weather_state_labels[i], "--");
                 }
-            } else {
+
+                // 更新预报天气图标
+                if (strlen(weather_data.forecast_weather_icons[i]) > 0)
+                {
+                    // Download weather icon
+                    char *icon_path = download_weather_icon(weather_data.forecast_weather_icons[i]);
+                    if (icon_path)
+                    {
+#if LV_USE_PNG
+                        // Load PNG file and create img_dsc
+                        lv_img_dsc_t *img_dsc = load_png_to_img_dsc(icon_path);
+                        if (img_dsc)
+                        {
+                            lv_img_set_src(icon_path, img_dsc);
+                            // Note: img_dsc will be freed by LVGL when the image is no longer used
+                        }
+                        else
+                        {
+                            __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load forecast PNG image: %s", icon_path);
+                        }
+#else
+                        // Fallback: try direct file path (may not work if file system not configured)
+                        lv_img_set_src(forecast_weather_icon_labels[i], icon_path);
+#endif
+                    }
+                }
+            }
+            else
+            {
                 lv_label_set_text(forecast_day_labels[i], "--");
                 lv_label_set_text(forecast_high_temp_labels[i], "--°");
                 lv_label_set_text(forecast_low_temp_labels[i], "--°");
                 lv_label_set_text(forecast_weather_state_labels[i], "--");
+                // lv_img_set_src(forecast_weather_icon_labels[i], "?");
             }
         }
-
     }
 }
