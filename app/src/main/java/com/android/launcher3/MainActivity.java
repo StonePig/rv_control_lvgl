@@ -1,4 +1,4 @@
-package com.hybird.lvgl.android;
+package com.android.launcher3;
 
 import android.Manifest;
 import android.app.Activity;
@@ -19,8 +19,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.hybird.lvgl.android.databinding.ActivityMainBinding;
-import com.hybird.lvgl.android.lvgl.LVGLEntrance;
+import com.android.launcher3.databinding.ActivityMainBinding;
+import com.android.launcher3.lvgl.LVGLEntrance;
 
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;

@@ -45,6 +45,8 @@ typedef struct
     size_t size;
 } memory_struct_t;
 
+static time_t last_update = 0;
+
 // Global weather data
 static weather_data_t weather_data = {0};
 
@@ -90,19 +92,19 @@ static char *download_weather_icon(const char *icon_id)
     if (!icon_id)
         return NULL;
 
-    // 检查data/data/com.hybird.lvgl.android/files目录是否存在
+    // 检查data/data/com.android.launcher3/files目录是否存在
     char dir_path[256];
-    snprintf(dir_path, sizeof(dir_path), "data/data/com.hybird.lvgl.android/files");
+    snprintf(dir_path, sizeof(dir_path), "data/data/com.android.launcher3/files");
     if (access(dir_path, F_OK) != 0)
     {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Directory %s does not exist, will create it", "data/data/com.hybird.lvgl.android/files");
-        mkdir("data/data/com.hybird.lvgl.android", 0755);
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Directory %s does not exist, will create it", "data/data/com.android.launcher3/files");
+        mkdir("data/data/com.android.launcher3", 0755);
         mkdir(dir_path, 0755);
     }
 
     // Build local file path
     static char file_path[256];
-    snprintf(file_path, sizeof(file_path), "data/data/com.hybird.lvgl.android/files/weather_icon_%s.png", icon_id);
+    snprintf(file_path, sizeof(file_path), "data/data/com.android.launcher3/files/weather_icon_%s.png", icon_id);
 
     // Check if file already exists locally
     if (access(file_path, F_OK) == 0)
@@ -152,6 +154,9 @@ static char *download_weather_icon(const char *icon_id)
     // Add SSL support
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    
+    // 强制使用 TLS 1.2 或更高版本
+    curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
     res = curl_easy_perform(curl);
 
@@ -489,7 +494,7 @@ static char *http_get(const char *url)
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
     // Add SSL support
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -933,11 +938,11 @@ static void *fetch_weather_data_thread(void *arg)
     char forecast_url[256];
 
     snprintf(current_weather_url, sizeof(current_weather_url),
-             "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
+             "http://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
 
     snprintf(forecast_url, sizeof(forecast_url),
-             "https://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
+             "http://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
 
     __android_log_print(ANDROID_LOG_DEBUG, TAG, "Fetching weather data for location: %.6f, %.6f", latitude, longitude);
@@ -948,8 +953,14 @@ static void *fetch_weather_data_thread(void *arg)
 
     if (current_weather && forecast)
     {
+
         parse_weather_data(current_weather, forecast);
         __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather data fetched: %s %s", weather_data.city, weather_data.temp);
+    }
+    else
+    {
+        last_update = 0; // Reset last update time on failure
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to fetch weather data");
     }
 
     // Cleanup
@@ -1157,7 +1168,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_width(weather_icon_img, LV_SIZE_CONTENT);
     lv_obj_set_height(weather_icon_img, LV_SIZE_CONTENT);
     lv_obj_align_to(weather_icon_img, weather_state_label, LV_ALIGN_OUT_BOTTOM_MID, -20, 0);
-    lv_img_set_zoom(weather_icon_img, 256);
+    lv_img_set_zoom(weather_icon_img, 256 + 256); // 2x zoom
 
     // 创建5天预报容器
     weather_forecast_container = lv_obj_create(weather_container);
@@ -1276,13 +1287,11 @@ void ui_Screen1_screen_relocalize(void)
         }
 
         // 定期获取天气数据（每10分钟更新一次）
-        static time_t last_update = 0;
         time_t now = time(NULL);
         if (now - last_update > 10 * 60 || last_update == 0)
         {
-            fetch_weather_data();
             last_update = now;
-            // curl_easy_init();
+            fetch_weather_data();
         }
 
         // 更新天气数据（使用真实数据）

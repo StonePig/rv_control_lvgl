@@ -1,4 +1,4 @@
-package com.hybird.lvgl.android;
+package com.android.launcher3;
 
 import android.content.Context;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.hybird.lvgl.android", appContext.getPackageName());
+        assertEquals("com.android.launcher3", appContext.getPackageName());
     }
 }

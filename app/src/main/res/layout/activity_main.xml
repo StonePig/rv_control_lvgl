@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <com.hybird.lvgl.android.lvgl.LVGLSurfaceView
+    <com.android.launcher3.lvgl.LVGLSurfaceView
         android:id="@+id/lvgl_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

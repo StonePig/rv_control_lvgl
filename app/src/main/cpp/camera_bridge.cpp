@@ -19,7 +19,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     }
     
     // Find MainActivity class and create global reference
-    jclass localClass = env->FindClass("com/hybird/lvgl/android/MainActivity");
+    jclass localClass = env->FindClass("com/android/launcher3/MainActivity");
     if (!localClass) {
         __android_log_print(ANDROID_LOG_ERROR, "camera_bridge", "Failed to find MainActivity class in JNI_OnLoad");
         return JNI_ERR;
@@ -38,7 +38,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Called from Java when a new RGBA frame is available (byte[])
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeCameraFrame(JNIEnv *env, jclass clazz, jbyteArray data, jint w, jint h, jint cam_index) {
+Java_com_android_launcher3_lvgl_LVGLEntrance_nativeCameraFrame(JNIEnv *env, jclass clazz, jbyteArray data, jint w, jint h, jint cam_index) {
     if (!data) return;
     jsize len = env->GetArrayLength(data);
     jbyte *buf = env->GetByteArrayElements(data, NULL);

@@ -36,6 +36,8 @@ static bool run = false;
 
 static lv_disp_draw_buf_t lv_disp_buf;
 
+extern void ui_init1(void);
+
 //填充屏幕为白色
 static void clearScreen() {
     //填充白屏
@@ -127,7 +129,7 @@ static void LvTouchRead(lv_indev_drv_t *drv, lv_indev_data_t *data) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeCreate(JNIEnv *env, jclass clazz,
+Java_com_android_launcher3_lvgl_LVGLEntrance_nativeCreate(JNIEnv *env, jclass clazz,
                                                             jobject surface) {
     __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s", __func__);
     window = ANativeWindow_fromSurface(env, surface);
@@ -136,7 +138,7 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeCreate(JNIEnv *env, jclass 
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeChanged(JNIEnv *env, jclass clazz,
+Java_com_android_launcher3_lvgl_LVGLEntrance_nativeChanged(JNIEnv *env, jclass clazz,
                                                              jobject surface, jint width,
                                                              jint height) {
     __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s", __func__);
@@ -184,7 +186,7 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeChanged(JNIEnv *env, jclass
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeDestroy(JNIEnv *env, jclass clazz,
+Java_com_android_launcher3_lvgl_LVGLEntrance_nativeDestroy(JNIEnv *env, jclass clazz,
                                                              jobject surface) {
     run = false;
     __android_log_print(ANDROID_LOG_ERROR, "LVGL", "func:%s", __func__);
@@ -199,7 +201,7 @@ Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeDestroy(JNIEnv *env, jclass
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_hybird_lvgl_android_lvgl_LVGLEntrance_nativeTouch(JNIEnv *env, jclass clazz, jint x,
+Java_com_android_launcher3_lvgl_LVGLEntrance_nativeTouch(JNIEnv *env, jclass clazz, jint x,
                                                            jint y, jboolean touch) {
     state.x = x;
     state.y = y;
