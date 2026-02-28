@@ -28,9 +28,9 @@ static lv_img_dsc_t * ui_camera_img = NULL;
 static uint8_t * ui_camera_data = NULL;
 
 // 3个camera预览小窗口
-#define CAMERA_PREVIEW_WIDTH 320
-#define CAMERA_PREVIEW_HEIGHT 240
-#define CAMERA_PREVIEW_1_X 50
+#define CAMERA_PREVIEW_WIDTH 294
+#define CAMERA_PREVIEW_HEIGHT 171
+#define CAMERA_PREVIEW_1_X 10
 #define CAMERA_PREVIEW_1_Y 80
 #define CAMERA_PREVIEW_2_X CAMERA_PREVIEW_1_X
 #define CAMERA_PREVIEW_2_Y CAMERA_PREVIEW_1_Y + CAMERA_PREVIEW_HEIGHT + 30
@@ -50,10 +50,11 @@ static lv_obj_t * camera_2_label = NULL;
 static lv_obj_t * camera_3_label = NULL;
 
 // cmaera预览图像数据
-#define CAMERA_PREVIEW_IMAGE_WIDTH 1280
-#define CAMERA_PREVIEW_IMAGE_HEIGHT 960
-#define CAMERA_PREVIEW_X 500
-#define CAMERA_PREVIEW_Y 10
+// 16：9 宽高比
+#define CAMERA_PREVIEW_IMAGE_WIDTH 1600
+#define CAMERA_PREVIEW_IMAGE_HEIGHT 900
+#define CAMERA_PREVIEW_X 315
+#define CAMERA_PREVIEW_Y 75
 static lv_obj_t * ui_Image_camera_preview_container = NULL;
 static lv_obj_t * ui_Image_camera_preview = NULL;
 static lv_obj_t * camera_preview_label = NULL;
@@ -126,8 +127,8 @@ void ui_Screen8_screen_init(void)
     ui_Screen8 = cur_ui_screen;
     lv_obj_clear_flag(cur_ui_screen, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    ui_Image_camera_preview_container_1 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_1_X, CAMERA_PREVIEW_1_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
-    ui_Image_camera_preview_container_2 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_2_X, CAMERA_PREVIEW_2_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
+    ui_Image_camera_preview_container_1 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_1_X-5, CAMERA_PREVIEW_1_Y-5, CAMERA_PREVIEW_WIDTH+10, CAMERA_PREVIEW_HEIGHT+10);
+    ui_Image_camera_preview_container_2 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_2_X-5, CAMERA_PREVIEW_2_Y-5, CAMERA_PREVIEW_WIDTH+10, CAMERA_PREVIEW_HEIGHT+10);
     // ui_Image_camera_preview_container_3 = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_3_X, CAMERA_PREVIEW_3_Y, CAMERA_PREVIEW_WIDTH, CAMERA_PREVIEW_HEIGHT);
     ui_Image_camera_preview_container = ui_create_display_container(cur_ui_screen, COLOR_NORMAL, CAMERA_PREVIEW_X, CAMERA_PREVIEW_Y, CAMERA_PREVIEW_IMAGE_WIDTH, CAMERA_PREVIEW_IMAGE_HEIGHT);
 

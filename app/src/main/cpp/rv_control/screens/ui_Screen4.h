@@ -16,6 +16,8 @@ extern void ui_Screen4_screen_destroy(void);
 extern void ui_Screen4_screen_relocalize(void);
 extern void ui_event_Screen4(lv_event_t * e);
 extern lv_obj_t * ui_Screen4;
+/** 刷新 WiFi 已连接行（连接成功回调后调用，便于立即更新 Connected 列表） */
+void ui_Screen4_refresh_wifi_connected_row(void);
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

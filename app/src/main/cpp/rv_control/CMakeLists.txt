@@ -1,4 +1,5 @@
-SET(SOURCES screens/ui_Screen1.c
+SET(SOURCES wifi_utils.c
+    screens/ui_Screen1.c
     screens/ui_Screen2.c
     screens/ui_Screen3.c
     screens/ui_Screen4.c

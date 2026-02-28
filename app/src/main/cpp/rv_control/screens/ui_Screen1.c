@@ -162,7 +162,7 @@ static char *download_weather_icon(const char *icon_id)
 
     if (res != CURLE_OK)
     {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        // __android_log_print(ANDROID_LOG_ERROR, TAG, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
         free(chunk.data);
         curl_easy_cleanup(curl);
         return NULL;
@@ -477,7 +477,7 @@ static char *http_get(const char *url)
     CURLcode res;
     memory_struct_t chunk;
 
-    __android_log_print(ANDROID_LOG_INFO, TAG, "Requesting URL: %s", url);
+    // __android_log_print(ANDROID_LOG_INFO, TAG, "Requesting URL: %s", url);
 
     chunk.data = (char *)malloc(1);
     chunk.size = 0;
@@ -503,7 +503,7 @@ static char *http_get(const char *url)
 
     if (res != CURLE_OK)
     {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        // __android_log_print(ANDROID_LOG_ERROR, TAG, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
         free(chunk.data);
         curl_easy_cleanup(curl);
         return NULL;
@@ -834,7 +834,7 @@ static void *fetch_weather_data_thread(void *arg)
     double longitude = 116.4074;
 
     // Get current location via IP geolocation
-    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Getting current location via IP geolocation");
+    // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Getting current location via IP geolocation");
 
     // Use ipinfo.io API to get location by IP
     const char *url = "http://ipinfo.io/json";
@@ -930,7 +930,7 @@ static void *fetch_weather_data_thread(void *arg)
     }
     else
     {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to get location data");
+        // __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to get location data");
     }
 
     // Build URLs
@@ -945,7 +945,7 @@ static void *fetch_weather_data_thread(void *arg)
              "http://api.openweathermap.org/data/2.5/forecast?lat=%f&lon=%f&appid=%s&units=metric&lang=zh_cn",
              latitude, longitude, OPENWEATHER_API_KEY);
 
-    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Fetching weather data for location: %.6f, %.6f", latitude, longitude);
+    // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Fetching weather data for location: %.6f, %.6f", latitude, longitude);
 
     // Fetch data
     char *current_weather = http_get(current_weather_url);
@@ -960,7 +960,7 @@ static void *fetch_weather_data_thread(void *arg)
     else
     {
         last_update = 0; // Reset last update time on failure
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to fetch weather data");
+        // __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to fetch weather data");
     }
 
     // Cleanup
@@ -969,14 +969,14 @@ static void *fetch_weather_data_thread(void *arg)
     if (forecast)
         free(forecast);
 
-    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather data fetch complete");
+    // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Weather data fetch complete");
 
     return NULL;
 }
 
 static void fetch_weather_data(void)
 {
-    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Starting weather data fetch thread");
+    // __android_log_print(ANDROID_LOG_DEBUG, TAG, "Starting weather data fetch thread");
 
     pthread_t thread;
     int result = pthread_create(&thread, NULL, fetch_weather_data_thread, NULL);

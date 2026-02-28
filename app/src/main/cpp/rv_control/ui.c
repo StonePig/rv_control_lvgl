@@ -73,6 +73,7 @@ void ui_init(void)
     ui_Screen7_screen_init();
     ui_Screen8_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
+    ui_common_init_pending_region_timer();
     ui_draw_cur_screen();
 
     // ---- Serial example: open /dev/ttyS1 and start reader ----

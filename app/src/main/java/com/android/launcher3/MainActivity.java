@@ -41,6 +41,14 @@ import java.util.Arrays;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+    /** 其他 App 返回时通过 Intent 携带的底部区域索引 key。
+     * 设置 App 通过 startActivity(HOME) 返回时，请同时把该 extra 放入 homeIntent，例如：
+     * homeIntent.putExtra(MainActivity.EXTRA_BOTTOM_REGION_INDEX, regionIndex);
+     * 这样 Launcher 在 onNewIntent/onCreate 中才能根据 regionIndex 切屏。 */
+    public static final String EXTRA_BOTTOM_REGION_INDEX = "extra_bottom_region_index";
+    /** 以 startActivityForResult 方式启动子应用时使用的 requestCode，用于接收 onActivityResult */
+    public static final int REQUEST_LAUNCH_APP_FOR_RESULT = 1001;
+
     private ActivityMainBinding binding;
     private static MainActivity instance;
 
@@ -76,6 +84,10 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
+        WiFiUtils.init(this);
+        LVGLEntrance.setContext(getApplicationContext());
+        LVGLEntrance.setActivity(this);
 
         // find hidden SurfaceViews used for camera preview targets
         try {
@@ -156,11 +168,51 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception ex) {
             Log.w(TAG, "preview surface views not found or not available", ex);
         }
+        // 若被其他应用通过 startActivity(HOME) 并携带 EXTRA_BOTTOM_REGION_INDEX 拉回，从 Intent 里取并切屏
+        handleRegionIndexFromIntent(getIntent());
+    }
+
+    /** 处理从 Intent 或返回数据中携带的 regionIndex，并通知 native 切换屏幕 */
+    private void handleRegionIndexFromIntent(android.content.Intent intent) {
+        Log.d(TAG, "handleRegionIndexFromIntent: intent=" + intent);
+        if (intent == null) return;
+        int regionIndex = intent.getIntExtra(EXTRA_BOTTOM_REGION_INDEX, -1);
+        if (regionIndex < 0 && intent.getExtras() != null) {
+            regionIndex = intent.getIntExtra("regionIndex", -1);
+            if (regionIndex < 0) regionIndex = intent.getIntExtra("bottom_region_index", -1);
+        }
+        if (regionIndex < 0) {
+            if (intent.getExtras() != null && !intent.getExtras().isEmpty()) {
+                Log.w(TAG, "handleRegionIndexFromIntent: Intent 有 extras 但缺少 key \"" + EXTRA_BOTTOM_REGION_INDEX + "\"，当前 keys=" + intent.getExtras().keySet());
+            } else {
+                Log.d(TAG, "handleRegionIndexFromIntent: 无 " + EXTRA_BOTTOM_REGION_INDEX + "，设置 App 返回时请执行 homeIntent.putExtra(MainActivity.EXTRA_BOTTOM_REGION_INDEX, regionIndex)");
+            }
+            return;
+        }
+        Log.d(TAG, "handleRegionIndexFromIntent: regionIndex=" + regionIndex + ", 切换屏幕");
+        LVGLEntrance.nativeSetRegionIndex(regionIndex);
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        handleRegionIndexFromIntent(intent);
+        setIntent(intent);
+        super.onNewIntent(intent);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        Log.d(TAG, "onActivityResult: requestCode=" + requestCode + ", resultCode=" + resultCode + ", data=" + data);
+        if (requestCode == REQUEST_LAUNCH_APP_FOR_RESULT && resultCode == Activity.RESULT_OK && data != null) {
+            handleRegionIndexFromIntent(data);
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        LVGLEntrance.setActivity(null);
         // stop all cameras
         for (int i = 0; i < 3; i++) stopCamera(i);
         instance = null;

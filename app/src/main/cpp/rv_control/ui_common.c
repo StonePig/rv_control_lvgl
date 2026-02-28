@@ -9,11 +9,42 @@ static lv_obj_t *container = NULL;
 
 static uint16_t cur_screen_id = 0;
 
+/* 与 MainActivity.REQUEST_LAUNCH_APP_FOR_RESULT 保持一致 */
+#define REQUEST_LAUNCH_APP_FOR_RESULT 1001
+
+/* 从设置等 App 返回时，由 Java 主线程设置；LVGL 刷新线程的 timer 里读取并执行切屏，避免先画一帧旧屏 */
+static volatile int pending_region_index = -1;
+
+void ui_switch_to_region_deferred(uint16_t index) {
+    if (index >= NAV_ICON_NUM) return;
+    pending_region_index = (int)index;
+}
+
 lv_obj_t *ui_Screen[] = {&ui_Screen1, &ui_Screen2, &ui_Screen3, &ui_Screen4, &ui_Screen5, &ui_Screen6, &ui_Screen7, &ui_Screen8};
 
 ui_screen_func_t ui_Screen_init_cb[] = {&ui_Screen1_screen_init, &ui_Screen2_screen_init, &ui_Screen3_screen_init, &ui_Screen4_screen_init, &ui_Screen5_screen_init, &ui_Screen6_screen_init, &ui_Screen7_screen_init, &ui_Screen8_screen_init};
 ui_screen_func_t ui_Screen_destroy_cb[] = {&ui_Screen1_screen_destroy, &ui_Screen2_screen_destroy, &ui_Screen3_screen_destroy, &ui_Screen4_screen_destroy, &ui_Screen5_screen_destroy, &ui_Screen6_screen_destroy, &ui_Screen7_screen_destroy, &ui_Screen8_screen_destroy};
 ui_screen_func_t ui_Screen_relocalize_cb[] = {ui_Screen1_screen_relocalize, ui_Screen2_screen_relocalize, ui_Screen3_screen_relocalize, ui_Screen4_screen_relocalize, ui_Screen5_screen_relocalize, ui_Screen6_screen_relocalize, ui_Screen7_screen_relocalize, ui_Screen8_screen_relocalize};
+
+static void pending_region_timer_cb(lv_timer_t * t) {
+    (void)t;
+    if (pending_region_index < 0) return;
+    uint16_t idx = (uint16_t)pending_region_index;
+    pending_region_index = -1;
+    cur_screen_id = idx;
+    if (cur_screen_id == 3) {
+        launch_android_app_for_result("com.elink.settings", REQUEST_LAUNCH_APP_FOR_RESULT);
+        return;
+    }
+    _ui_screen_change(ui_Screen[cur_screen_id], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[cur_screen_id]);
+    ui_Screen_relocalize_cb[cur_screen_id]();
+}
+
+void ui_common_init_pending_region_timer(void) {
+    static lv_timer_t * timer = NULL;
+    if (timer) return;
+    timer = lv_timer_create(pending_region_timer_cb, 0, NULL);
+}
 
 // 创建显示容器
 lv_obj_t * ui_create_display_container(lv_obj_t *parent, lv_color_t bg_color, uint16_t x, uint16_t y, uint16_t width, uint16_t height)
@@ -42,9 +73,33 @@ void bar_navi_event(lv_event_t *e)
         return;
     
     lv_obj_t *target = lv_event_get_target(e);
-    cur_screen_id = (uint16_t)lv_obj_get_user_data(target);
+    uint16_t clicked = (uint16_t)lv_obj_get_user_data(target);
     
-    if (cur_screen_id >= 0 && cur_screen_id < NAV_ICON_NUM)
+    if (clicked >= 0 && clicked < NAV_ICON_NUM)
+    {
+        if (clicked == 3)
+        {
+            launch_android_app_for_result("com.elink.settings", REQUEST_LAUNCH_APP_FOR_RESULT);
+            return;
+        }
+        cur_screen_id = clicked;
+        _ui_screen_change(ui_Screen[cur_screen_id], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[cur_screen_id]);
+        ui_Screen_relocalize_cb[cur_screen_id]();
+    }
+}
+
+/* 供外部（如 Java）按索引切换底部区域/屏幕：0->Screen1, 1->Screen2, ... */
+void ui_switch_to_region(uint16_t index)
+{
+    if (index >= NAV_ICON_NUM)
+        return;
+
+    cur_screen_id = index;
+    if (cur_screen_id == 3)
+    {
+        launch_android_app_for_result("com.elink.settings", REQUEST_LAUNCH_APP_FOR_RESULT);
+    }
+    else
     {
         _ui_screen_change(ui_Screen[cur_screen_id], LV_SCR_LOAD_ANIM_NONE, 50, 0, ui_Screen_init_cb[cur_screen_id]);
         ui_Screen_relocalize_cb[cur_screen_id]();
@@ -65,6 +120,22 @@ static bool is_navi_index_selected(uint8_t index, lv_obj_t *parent)
         return false;
 }
 
+// 绘制状态栏
+void ui_draw_status_bar(lv_obj_t *parent)
+{
+    // 创建状态栏
+    lv_obj_t *status_bar = lv_obj_create(parent);
+    lv_obj_set_size(status_bar, SCREEN_DISPLAY_WIDTH, 139 / 2);
+    lv_obj_set_style_bg_color(status_bar, COLOR_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(status_bar, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(status_bar, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* 去掉可见边框 */
+    lv_obj_set_style_border_width(status_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_opa(status_bar, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_outline_opa(status_bar, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+ 
+}
+
 void ui_draw_cur_screen(void)
 {
     if (cur_screen_id >= NAV_ICON_NUM)
@@ -76,6 +147,8 @@ void ui_draw_cur_screen(void)
 
 void ui_draw_navigation_bar(lv_obj_t *parent)
 {
+    ui_draw_status_bar(parent);
+
     // 创建底部导航栏（8个图标）
     int nav_y = 980;
     int nav_icon_width = 1920 / 8;

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">RvLauncher</string>
+    <string name="wifi_disconnect_open_settings">无法直接断开该网络，请在系统设置中关闭或忘记当前 WiFi</string>
 </resources>

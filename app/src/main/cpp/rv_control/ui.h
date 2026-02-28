@@ -107,6 +107,19 @@ void ui_navigation_bar_destroy(void);
 lv_obj_t *ui_create_display_container(lv_obj_t *parent, lv_color_t bg_color, uint16_t x, uint16_t y, uint16_t width, uint16_t height);
 void ui_draw_cur_screen(void);
 
+/** 通过包名启动 Android 应用，由 Java LVGLEntrance.launchApp 实现 */
+void launch_android_app(const char *package_name);
+
+/** 以 startActivityForResult 方式启动应用，以便收到 onActivityResult；request_code 需与 MainActivity.REQUEST_LAUNCH_APP_FOR_RESULT 一致 */
+void launch_android_app_for_result(const char *package_name, int request_code);
+
+/** 按底部区域索引切换屏幕：regionIndex=0->Screen1, 1->Screen2, ... */
+void ui_switch_to_region(uint16_t index);
+
+/** 仅设置“待切屏”索引，由 LVGL 刷新线程在下一帧前执行切屏，用于从设置返回时避免先画一帧旧屏 */
+void ui_switch_to_region_deferred(uint16_t index);
+void ui_common_init_pending_region_timer(void);
+
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif
